@@ -97,9 +97,9 @@
 
 ### Export — Cut & Concat
 
-- [ ] **EXPC-01**: `extract_clip(input_path, output_path, start_sec, end_sec)` invokes `ffmpeg -y -ss <start> -to <end> -i <input> -c copy <output>` via `subprocess.run`
-- [ ] **EXPC-02**: `concat_clips(clip_paths, output_path, temp_dir)` writes a concat manifest with absolute paths and runs `ffmpeg -y -f concat -safe 0 -i <manifest> -c copy <output>`
-- [ ] **EXPC-03**: §0.5 verification: each intermediate clip file exists and is non-zero bytes; first clip is the correct segment when played; final reel is a coherent concatenation
+- [x] **EXPC-01**: `extract_clip(input_path, output_path, start_sec, end_sec)` invokes `ffmpeg -y -ss <start> -to <end> -i <input> -c copy <output>` via `subprocess.run`
+- [x] **EXPC-02**: `concat_clips(clip_paths, output_path, temp_dir)` writes a concat manifest with absolute paths and runs `ffmpeg -y -f concat -safe 0 -i <manifest> -c copy <output>`
+- [x] **EXPC-03**: §0.5 verification: each intermediate clip file exists and is non-zero bytes; first clip is the correct segment when played; final reel is a coherent concatenation
 
 ### Orchestration & CLI
 
@@ -204,9 +204,9 @@ Confirmed by roadmap creation (2026-05-06). Every v1 requirement is mapped to ex
 | SELB-04 | Phase 3 | Complete |
 | SELB-05 | Phase 3 | Complete |
 | SELB-06 | Phase 3 | Complete |
-| EXPC-01 | Phase 4 | Pending |
-| EXPC-02 | Phase 4 | Pending |
-| EXPC-03 | Phase 4 | Pending |
+| EXPC-01 | Phase 4 | Complete |
+| EXPC-02 | Phase 4 | Complete |
+| EXPC-03 | Phase 4 | Complete |
 | ORCH-01 | Phase 5 | Pending |
 | ORCH-02 | Phase 5 | Pending |
 | ORCH-03 | Phase 5 | Pending |

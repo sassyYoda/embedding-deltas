@@ -30,7 +30,7 @@ These hold across all phases and are referenced explicitly where they lock:
 - [x] **Phase 1: Frame Extraction & Embeddings** — `extract.py` + utils video-metadata helpers; produce the canonical `(timestamps, embeddings)` fixture from one sample video, with all 8 frame/embedding pitfalls neutralized. **DONE 2026-05-06** — verified on `videos/justin_timberlake.mp4` (615s on MPS); fixture at `output/cache/justin_timberlake_{embeddings,timestamps}.npy`.
 - [x] **Phase 2: Signal Processing** — `signal_processing.py` deltas/median/MAD on Phase-1 fixture; lock the timestamp-alignment invariant with a synthetic test; lazy-import PELT as opt-in. **DONE 2026-05-06** — 5 functions + §0.5 harness PASS in 0.49 s on JT (2,269-frame fixture); `output/cache/justin_timberlake_scores.npy` (2268,) float64 written; SC1–SC5 all PASS.
 - [x] **Phase 3: Clip Selection** — `clip_selection.py` peaks/padding/build/merge/budget; the single index→seconds conversion site; thread `peak_time` through merge. **DONE 2026-05-06** — 7 functions + §0.5 harness PASS in 2.27 s on JT (40 peaks → 4 final clips, total=37.805s = 100% of 37.805s budget); `output/cache/justin_timberlake_final_clips.json` written; SC1–SC5 all PASS; Pitfalls 18/19/20 neutralized.
-- [ ] **Phase 4: Export** — `export.py` ffmpeg cut (`-c copy`) and concat (demuxer with concat-filter re-encode fallback); own all subprocess calls.
+- [x] **Phase 4: Export** — `export.py` ffmpeg cut (`-c copy`) and concat (demuxer with concat-filter re-encode fallback); own all subprocess calls. **DONE 2026-05-06** — 3 functions + §0.5 harness PASS in 2s on JT (4 clips → 1 reel via demuxer path; reel duration 38.491s vs sum 37.805s = drift 0.686s < 5.0s); `output/reels/justin_timberlake_highlight.mp4` (15.5 MB) written; SC1–SC3 all PASS; Pitfalls 11/12/13 neutralized.
 - [ ] **Phase 5: Orchestration & First-Video End-to-End** — `pipeline.py` glue + JSON §8 schema + determinism env vars; tune `--height`/`--min-gap-sec`/`--merge-gap-sec` on the most representative video and freeze; produce one watchable reel.
 - [ ] **Phase 6: Multi-Video Run & Submission Polish** — run remaining 4 videos with frozen parameters; `run_all.sh`; README with design rationale, known limitations (spec §11), per-video qualitative observations.
 
@@ -85,7 +85,8 @@ These hold across all phases and are referenced explicitly where they lock:
   1. `extract_clip(input, output, start, end)` invokes `ffmpeg -y -ss <start> -to <end> -i <input> -c copy <output>` (`-ss` *before* `-i` for stream-copy correctness — Pitfall 11); after each call, `os.path.getsize(output) > 0` is asserted (EXPC-01).
   2. `concat_clips(clip_paths, output, temp_dir)` writes a concat manifest with `os.path.abspath` paths and quote-sanitized stems (Pitfall 13), invokes `ffmpeg -y -f concat -safe 0 -i <manifest> -c copy <output>`, and pre-validates clips with `ffprobe` (codec/timebase consistency check — Pitfall 12); on demuxer failure, falls back to the concat-filter re-encode path (`-c:v libx264 -crf 18`) and logs the fallback (EXPC-02).
   3. Running export against a hand-authored 3-clip list on one sample video produces 3 non-zero-byte intermediate clips and a single concatenated reel that plays end-to-end without frozen frames at clip boundaries (the §0.5 verification: "first clip is the correct segment when played; final reel is a coherent concatenation") (EXPC-03).
-**Plans:** TBD
+**Plans:** 1 plan (complete)
+- [x] 04-01-PLAN.md — export.py: extract_clip (-ss BEFORE -i; Pitfall 11), validate_clips_for_concat (ffprobe pre-flight; Pitfall 12), concat_clips (demuxer + concat-filter libx264 fallback; -safe 0 + abspath + single-quote escape; Pitfall 13) + §0.5 harness producing output/reels/justin_timberlake_highlight.mp4 with <5.0s drift assertion. Covers EXPC-01..03. SUMMARY: 04-01-SUMMARY.md
 
 ### Phase 5: Orchestration & First-Video End-to-End
 **Goal:** Wire the four module phases together in `pipeline.py`, emit the JSON §8 manifest with the strict three-state PELT field, lock determinism env vars at entry, and produce **one watchable reel** on the most representative sample video — at which point parameters are tuned once and frozen for Phase 6. This phase is the spec footer's gating moment: "Get one video working end to end before touching the others."
@@ -120,7 +121,7 @@ These hold across all phases and are referenced explicitly where they lock:
 | 1. Frame Extraction & Embeddings | 0/2 | Planned | - |
 | 2. Signal Processing | 0/1 | Planned | - |
 | 3. Clip Selection | 1/1 | Complete | 2026-05-06 |
-| 4. Export | 0/0 | Not started | - |
+| 4. Export | 1/1 | Complete | 2026-05-06 |
 | 5. Orchestration & First-Video End-to-End | 0/0 | Not started | - |
 | 6. Multi-Video Run & Submission Polish | 0/0 | Not started | - |
 
