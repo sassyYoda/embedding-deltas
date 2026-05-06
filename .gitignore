@@ -1,2 +1,16 @@
 .DS_Store
 videos/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+
+# Project artifacts
+output/
+
+# Editor
+.vscode/
+.idea/

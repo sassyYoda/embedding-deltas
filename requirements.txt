@@ -1,0 +1,16 @@
+# Body Cam Highlight Reel — locked dependencies (verified 2026-05-06)
+# Note: spec §1 lists `ffmpeg-python` but it is dropped per research/STACK.md —
+# the project is unmaintained since 2019 and spec §7 uses subprocess.run directly.
+# scipy pinned to 1.16.2 to dodge the 1.15 medfilt regression (scipy issue #22333).
+
+torch==2.11.0
+torchvision==0.26.0
+open_clip_torch==3.3.0
+
+opencv-python==4.13.0.92
+
+numpy>=2.1,<2.5
+scipy==1.16.2
+ruptures==1.1.10
+
+tqdm>=4.67,<5
