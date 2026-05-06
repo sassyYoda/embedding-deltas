@@ -38,6 +38,8 @@ import os
 import subprocess
 from pathlib import Path
 
+from utils import ensure_output_dirs, probe_video_metadata
+
 
 def extract_clip(
     input_path: str | Path,
@@ -273,3 +275,138 @@ def concat_clips(
     # D-53: post-call zero-byte guard for the reel as well.
     if os.path.getsize(out_str) <= 0:
         raise RuntimeError(f"concat produced empty file: {out_str}")
+
+
+if __name__ == "__main__":
+    # Spec §0.5 verification harness for Phase 4 (D-58). Runs as:
+    #   python export.py [<video_name>]
+    # Mirrors clip_selection.py's __main__ pattern verbatim per D-58 / Phase 1 D-16
+    # / Phase 2 D-34 / Phase 3 D-49.
+    import argparse
+    import sys
+
+    parser = argparse.ArgumentParser(
+        description=(
+            "Phase 4 §0.5 verification harness for export.py "
+            "(D-58: inline __main__ — no separate test scaffolding per "
+            "Phase 1 D-16 / Phase 2 D-34 / Phase 3 D-49)."
+        )
+    )
+    parser.add_argument(
+        "video",
+        nargs="?",
+        default=None,
+        help=(
+            "Video name stem (e.g. 'justin_timberlake'). If omitted, picks the "
+            "most-recent *_final_clips.json under output/cache/ by mtime."
+        ),
+    )
+    args = parser.parse_args()
+
+    cache = Path("output/cache")
+
+    # ── Step 0: resolve video stem (smart default per D-58) ────────────────────
+    if args.video is None:
+        candidates = sorted(
+            cache.glob("*_final_clips.json"),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
+        )
+        if not candidates:
+            print(
+                "[FATAL] no *_final_clips.json under output/cache/. "
+                "Run `python clip_selection.py <video>` first.",
+                file=sys.stderr,
+            )
+            sys.exit(2)
+        video_name = candidates[0].stem.removesuffix("_final_clips")
+        print(f"[auto] using fixture: {video_name}")
+    else:
+        video_name = args.video
+
+    # ── Step 1: load fixture + resolve video file ──────────────────────────────
+    fixture_path = cache / f"{video_name}_final_clips.json"
+    video_path = Path("videos") / f"{video_name}.mp4"
+    if not fixture_path.exists():
+        print(f"[FATAL] missing fixture: {fixture_path}", file=sys.stderr)
+        sys.exit(2)
+    if not video_path.exists():
+        print(f"[FATAL] video file not found: {video_path}", file=sys.stderr)
+        sys.exit(2)
+    with open(fixture_path) as f:
+        clips_json = json.load(f)
+    print(f"[fixture] loaded {len(clips_json)} clips from {fixture_path}")
+
+    # ── Step 2: ensure output dirs (idempotent; from utils per Phase 1 D-20) ──
+    paths = ensure_output_dirs(video_name)
+    clips_dir = paths["clips"]   # output/clips/{video_name}/
+    reels_dir = paths["reels"]   # output/reels/
+    reel_path = reels_dir / f"{video_name}_highlight.mp4"
+
+    # ── Step 3: extract each clip via extract_clip (D-52..D-54 / Pitfall 11) ──
+    clip_paths: list[Path] = []
+    sum_clip_duration = 0.0
+    for i, clip in enumerate(clips_json):
+        start = float(clip["start_sec"])
+        end = float(clip["end_sec"])
+        duration = end - start
+        sum_clip_duration += duration
+        out_clip = clips_dir / f"{i:03d}.mp4"
+        print(
+            f"[clip-{i + 1}/{len(clips_json)}] start={start:.3f} end={end:.3f} "
+            f"dur={duration:.3f}s -> {out_clip.name}"
+        )
+        try:
+            extract_clip(video_path, out_clip, start, end)
+        except RuntimeError as e:
+            print(f"[FATAL] extract_clip failed at clip {i}: {e}", file=sys.stderr)
+            sys.exit(3)
+        clip_paths.append(out_clip)
+    sizes = [(p.name, os.path.getsize(p)) for p in clip_paths]
+    print(f"[extract] {len(clip_paths)}/{len(clips_json)} clip files: {sizes}")
+
+    # ── Step 4: validate + report which path will be taken (D-55 / Pitfall 12)
+    ok, reason = validate_clips_for_concat([str(p) for p in clip_paths])
+    print(f"[validate] codec_consistency={'PASS' if ok else 'FAIL'} reason={reason!r}")
+
+    # ── Step 5: concat (demuxer or fallback per D-55; logs path inside) ───────
+    try:
+        concat_clips([str(p) for p in clip_paths], str(reel_path), str(clips_dir))
+    except RuntimeError as e:
+        print(f"[FATAL] concat_clips failed: {e}", file=sys.stderr)
+        sys.exit(3)
+    reel_size = os.path.getsize(reel_path) if reel_path.exists() else 0
+    if reel_size <= 0:
+        print(
+            f"[FATAL] reel missing or zero-byte after concat: {reel_path}",
+            file=sys.stderr,
+        )
+        sys.exit(4)
+    print(f"[concat] reel={reel_path} size={reel_size} bytes")
+
+    # ── Step 6: probe reel + drift assertion (D-59: < 5.0s tolerance) ─────────
+    reel_meta = probe_video_metadata(reel_path)
+    reel_duration = float(reel_meta["duration_sec"])
+    drift = abs(reel_duration - sum_clip_duration)
+    print(
+        f"[reel] duration={reel_duration:.3f}s expected~={sum_clip_duration:.3f}s "
+        f"diff={drift:.3f}s tolerance=5.000s"
+    )
+    if drift >= 5.0:
+        print(
+            f"[FATAL] reel duration drift {drift:.3f}s >= 5.0s tolerance "
+            f"(D-59 — keyframe alignment exceeded budget)",
+            file=sys.stderr,
+        )
+        sys.exit(4)
+
+    # ── Step 7: §0.5 manual-check hint + final banner (D-58, spec §0.5) ───────
+    print(
+        f"[manual-check] play {reel_path} to confirm coherent concatenation "
+        f"(spec §0.5)"
+    )
+    print(
+        f"[manual-check] play {clip_paths[0]} to confirm first clip is correct "
+        f"segment (spec §0.5)"
+    )
+    print("Phase 4 §0.5 verification: PASS")
