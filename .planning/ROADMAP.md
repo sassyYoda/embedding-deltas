@@ -47,7 +47,9 @@ These hold across all phases and are referenced explicitly where they lock:
   2. Running `extract.sample_frames(<sample.mp4>)` prints the sampled frame count and the first 5 timestamps; the timestamps are spaced ≈0.5s apart **and come from `cap.get(CAP_PROP_POS_MSEC)`, not nominal frame index** (handles VFR — Pitfall 2); video duration is sourced from `ffprobe`, not `CAP_PROP_FRAME_COUNT` (Pitfall 3); `assert abs(timestamps[-1] - ffprobe_duration) < 1.0` passes (EXTR-01..05).
   3. Running `extract.embed_frames(...)` on the same video prints embedding shape `(N, 768)` and the **hard assertion** `np.allclose(np.linalg.norm(emb, axis=1), 1.0, atol=1e-5)` passes — explicit L2 normalization is in the code, not assumed from `open_clip` (Pitfall 6); `model.eval()` and `torch.inference_mode()` wrap inference (Pitfall 4); a 32-batched code path is the only path used (Pitfall 7); embedding the same frame twice in one process produces bit-identical output (EMBD-01..06).
   4. The §0.5 print-and-assert verification block at the end of `extract.py` runs successfully on at least one of the five sample videos and emits `(N, 768)` + L2-norm pass to stdout — this is the gate to start Phase 2.
-**Plans:** TBD
+**Plans:** 2 plans
+- [ ] 01-01-PLAN.md — Project skeleton, pinned deps, gitignore, and utils.py (probe_video_metadata, ensure_output_dirs, setup_logger). Covers ENV-01..04.
+- [ ] 01-02-PLAN.md — extract.py: sample_frames (CAP_PROP_POS_MSEC), load_model, embed_frames (batched + L2-asserted), §0.5 verification harness with bit-identical rerun and --save-fixture writer. Covers EXTR-01..05, EMBD-01..06.
 
 ### Phase 2: Signal Processing
 **Goal:** Convert embeddings to a clean per-sample `scores` array in index space, with the timestamp-alignment invariant locked and verified, and with PELT available as an opt-in path that does not perturb the default pipeline.
@@ -113,7 +115,7 @@ These hold across all phases and are referenced explicitly where they lock:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Frame Extraction & Embeddings | 0/0 | Not started | - |
+| 1. Frame Extraction & Embeddings | 0/2 | Planned | - |
 | 2. Signal Processing | 0/0 | Not started | - |
 | 3. Clip Selection | 0/0 | Not started | - |
 | 4. Export | 0/0 | Not started | - |
