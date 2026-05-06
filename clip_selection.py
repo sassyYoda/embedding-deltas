@@ -309,3 +309,255 @@ def enforce_budget(
             f"end={c[1]} (Pitfalls 18 + 19)"
         )
     return selected
+
+
+if __name__ == "__main__":
+    # Spec §0.5 verification harness for Phase 3 (D-49). Runs as:
+    #   python clip_selection.py [<video_name>] [--save-fixture | --no-save-fixture]
+    #     [--pelt] [--height H] [--min-gap-sec G] [--merge-gap-sec M]
+    # Mirrors signal_processing.py's __main__ pattern verbatim per D-49 / Phase 1 D-16.
+    import argparse
+    import json
+    import sys
+
+    parser = argparse.ArgumentParser(
+        description=(
+            "Phase 3 §0.5 verification harness for clip_selection.py "
+            "(D-49: inline __main__ — no separate test scaffolding per "
+            "Phase 1 D-16 / Phase 2 D-34)."
+        )
+    )
+    parser.add_argument(
+        "video",
+        nargs="?",
+        default=None,
+        help=(
+            "Video name stem (e.g. 'justin_timberlake'). If omitted, picks the "
+            "most-recent *_scores.npy under output/cache/ by mtime."
+        ),
+    )
+    parser.add_argument(
+        "--save-fixture",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help=(
+            "Write output/cache/{video}_final_clips.json (D-50 — Phase 4 dev "
+            "fixture). Default ON; pass --no-save-fixture to skip."
+        ),
+    )
+    parser.add_argument(
+        "--pelt",
+        action="store_true",
+        default=False,
+        help=(
+            "Apply PELT score boost. Loads output/cache/{video}_changepoints.npy "
+            "(produced by `python signal_processing.py --pelt`). Off by default."
+        ),
+    )
+    parser.add_argument(
+        "--height",
+        type=float,
+        default=1.5,
+        help="MAD score threshold for find_peaks (spec §6 default 1.5).",
+    )
+    parser.add_argument(
+        "--min-gap-sec",
+        type=float,
+        default=15.0,
+        help="Minimum seconds between peaks (spec §6 default 15.0).",
+    )
+    parser.add_argument(
+        "--merge-gap-sec",
+        type=float,
+        default=3.0,
+        help="Maximum gap between adjacent clips to merge (spec §6 default 3.0).",
+    )
+    args = parser.parse_args()
+
+    cache = Path("output/cache")
+
+    # ── Step 0: resolve video stem (smart default) ─────────────────────────────
+    if args.video is None:
+        candidates = sorted(
+            cache.glob("*_scores.npy"),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
+        )
+        if not candidates:
+            print(
+                "[FATAL] no *_scores.npy under output/cache/. "
+                "Run `python signal_processing.py <video>` first.",
+                file=sys.stderr,
+            )
+            sys.exit(2)
+        video_name = candidates[0].stem.removesuffix("_scores")
+        print(f"[auto] using fixture: {video_name}")
+    else:
+        video_name = args.video
+
+    # ── Step 1: load fixtures ──────────────────────────────────────────────────
+    scores_path = cache / f"{video_name}_scores.npy"
+    ts_path = cache / f"{video_name}_timestamps.npy"
+    if not scores_path.exists() or not ts_path.exists():
+        print(
+            f"[FATAL] missing fixture: {scores_path} or {ts_path}",
+            file=sys.stderr,
+        )
+        sys.exit(2)
+    scores = np.load(scores_path)        # (N-1,) float64
+    timestamps = np.load(ts_path)        # (N,) float64
+    print(
+        f"[fixture] loaded {video_name}: "
+        f"scores={scores.shape} timestamps={timestamps.shape}"
+    )
+
+    # Probe duration (single source of truth — utils.probe_video_metadata,
+    # NOT timestamps[-1]).
+    from utils import probe_video_metadata
+    video_path = Path("videos") / f"{video_name}.mp4"
+    if not video_path.exists():
+        print(f"[FATAL] video file not found: {video_path}", file=sys.stderr)
+        sys.exit(2)
+    meta = probe_video_metadata(video_path)
+    video_duration_sec = float(meta["duration_sec"])
+    print(
+        f"[meta] duration={video_duration_sec:.3f}s codec={meta['codec']} "
+        f"is_vfr={meta['is_vfr']}"
+    )
+
+    # Optional --pelt: load changepoints fixture
+    changepoints: list[int] | None = None
+    if args.pelt:
+        cp_path = cache / f"{video_name}_changepoints.npy"
+        if not cp_path.exists():
+            print(
+                f"[FATAL] --pelt set but missing {cp_path}. "
+                f"Run `python signal_processing.py {video_name} --pelt` first.",
+                file=sys.stderr,
+            )
+            sys.exit(2)
+        changepoints = np.load(cp_path).astype(int).tolist()
+        print(f"[pelt] loaded {len(changepoints)} changepoints")
+
+    # ── Step 2: select_peaks + §0.5 print after peaks (D-41 / SELP-04) ─────────
+    peak_indices, peak_scores = select_peaks(
+        scores, timestamps,
+        height=args.height, min_gap_sec=args.min_gap_sec, fps=2.0,
+    )
+    # Pitfall 20 secondary echo (function asserts internally; print for operator).
+    if len(peak_indices) >= 2:
+        min_gap_samples_observed = int(np.diff(np.sort(peak_indices)).min())
+        assert min_gap_samples_observed >= int(args.min_gap_sec * 2.0), (
+            f"[peaks] min gap {min_gap_samples_observed} < "
+            f"{int(args.min_gap_sec * 2.0)} samples (Pitfall 20)"
+        )
+    print(f"[peaks] count={len(peak_indices)}")
+    preview_n = min(10, len(peak_indices))
+    for i in range(preview_n):
+        idx = int(peak_indices[i])
+        pt = score_index_to_timestamp(idx, timestamps)
+        print(
+            f"[peaks]   #{i}: idx={idx} ts={pt:.3f}s "
+            f"score={peak_scores[i]:.4f}"
+        )
+
+    # ── Step 3: optional PELT boost (D-42 / SELP-03) ───────────────────────────
+    if args.pelt and changepoints is not None:
+        peak_indices, peak_scores = apply_pelt_boost(
+            peak_indices, peak_scores, changepoints, window=5, boost=1.2,
+        )
+        print(f"[pelt-boost] re-sorted; top score now {peak_scores[0]:.4f}")
+
+    # ── Step 4: compute_budget_seconds + compute_padding ───────────────────────
+    budget_sec = compute_budget_seconds(video_duration_sec)
+    padding_sec = compute_padding(budget_sec)
+    print(
+        f"[budget] duration={video_duration_sec:.3f}s -> "
+        f"budget={budget_sec:.3f}s padding={padding_sec:.3f}s"
+    )
+
+    # ── Step 5: build_clips ────────────────────────────────────────────────────
+    clips = build_clips(
+        peak_indices, peak_scores, timestamps,
+        video_duration_sec, padding_sec,
+    )
+    for c in clips:
+        assert c[0] <= c[3] <= c[1], f"[build_clips] alignment broken: {c}"
+    print(f"[build_clips] {len(clips)} candidate clips (chronological)")
+
+    # ── Step 6: merge_clips (Pitfall 19 hard-asserted inside the function) ────
+    merged = merge_clips(clips, gap_threshold_sec=args.merge_gap_sec)
+    print(
+        f"[merge] {len(clips)} -> {len(merged)} clips after "
+        f"gap_threshold={args.merge_gap_sec}s"
+    )
+    for c in merged:
+        assert c[0] <= c[3] <= c[1], f"[merge] alignment broken: {c}"
+
+    # ── Step 7: enforce_budget + §0.5 final clip print (D-48 / SELB-06) ───────
+    final = enforce_budget(merged, budget_sec)
+    total = sum(c[1] - c[0] for c in final)
+    pct = (total / budget_sec * 100.0) if budget_sec > 0 else 0.0
+    print(f"[budget] total={total:.3f}s / budget={budget_sec:.3f}s ({pct:.1f}%)")
+    for i, (s, e, sc, pt) in enumerate(final):
+        dur = e - s
+        print(
+            f"[clip-{i}] start={s:.3f} end={e:.3f} dur={dur:.3f} "
+            f"score={sc:.4f} peak_time={pt:.3f}"
+        )
+    # Echo asserts (functions already enforce; surface for operator).
+    assert total <= budget_sec + 1e-6, f"[budget] over: {total} > {budget_sec}"
+    for c in final:
+        assert c[0] <= c[3] <= c[1], f"[final] alignment broken: {c}"
+    for i in range(len(final) - 1):
+        assert final[i][1] <= final[i + 1][0], (
+            f"[final] overlap: {final[i]} vs {final[i + 1]}"
+        )
+
+    # ── Step 8: synthetic embedded test (D-49) ─────────────────────────────────
+    # Catches off-by-ones in merge / budget logic that pure-fixture tests miss.
+    synth_scores = np.full(100, 0.3)
+    for idx, h in [(20, 4.0), (40, 5.0), (60, 3.0), (80, 6.0)]:
+        synth_scores[idx] = h
+    synth_ts = np.arange(101) * 0.5  # 0.0..50.0
+    synth_pi, synth_ps = select_peaks(
+        synth_scores, synth_ts, height=1.5, min_gap_sec=5.0, fps=2.0,
+    )  # min_gap_samples = 10 → all 4 peaks survive (gaps are 20)
+    assert len(synth_pi) == 4, f"[synth] peaks: {len(synth_pi)}"
+    synth_clips = build_clips(
+        synth_pi, synth_ps, synth_ts,
+        video_duration_sec=50.0, padding_sec=3.0,
+    )
+    assert len(synth_clips) == 4
+    # peak idx 20 → ts at offset 21 = 10.5; clip = (7.5, 13.5, 4.0, 10.5)
+    synth_chrono = sorted(synth_clips, key=lambda c: c[0])
+    expected_first = (7.5, 13.5, 4.0, 10.5)
+    assert synth_chrono[0] == expected_first, (
+        f"[synth] first clip: {synth_chrono[0]} != {expected_first}"
+    )
+    synth_merged = merge_clips(synth_clips, gap_threshold_sec=3.0)
+    # 6s-wide clips with 7s gaps → no merges expected; alignment must hold.
+    assert len(synth_merged) >= 1
+    for c in synth_merged:
+        assert c[0] <= c[3] <= c[1]
+    synth_final = enforce_budget(synth_merged, budget_sec=10.0)
+    synth_total = sum(c[1] - c[0] for c in synth_final)
+    assert synth_total <= 10.0 + 1e-6
+    print("[synthetic] PASS  (peaks, build, merge, budget all chained correctly)")
+
+    # ── Step 9: write fixture (D-50) ───────────────────────────────────────────
+    if args.save_fixture:
+        from utils import ensure_output_dirs
+        paths = ensure_output_dirs(video_name)
+        cache_dir = paths["cache"]
+        fixture_path = cache_dir / f"{video_name}_final_clips.json"
+        payload = [
+            {"start_sec": s, "end_sec": e, "score": sc, "peak_time": pt}
+            for s, e, sc, pt in final
+        ]
+        with open(fixture_path, "w") as f:
+            json.dump(payload, f, indent=2)
+        print(f"[fixture] wrote {fixture_path}")
+
+    # ── Step 10: final banner ──────────────────────────────────────────────────
+    print("Phase 3 §0.5 verification: PASS")
