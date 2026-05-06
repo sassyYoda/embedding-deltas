@@ -96,10 +96,14 @@ def load_model() -> tuple[Any, Any, torch.device]:
     torch.backends.cudnn.benchmark = False
     torch.backends.cudnn.deterministic = True
 
-    # D-09 / EMBD-01: exact spec call, no substitution.
+    # D-09 / EMBD-01: exact spec call. force_quick_gelu=True forces QuickGELU activation
+    # in the model config to match OpenAI's pretrained checkpoint (which was trained with
+    # QuickGELU). Without this, open_clip 3.3.0 builds a standard-GELU model and emits a
+    # mismatch warning — silently degrading embedding quality. Spec §2 explicitly relies
+    # on the QuickGELU variant for the Koddenbrock 2025 robustness justification.
     # Returns 3-tuple (model, preprocess_train, preprocess_val); we use preprocess_val.
     model, _, preprocess = open_clip.create_model_and_transforms(
-        'ViT-L-14', pretrained='openai'
+        'ViT-L-14', pretrained='openai', force_quick_gelu=True
     )
     model = model.to(device)
     model.eval()  # D-15 / Pitfall 4 — also called defensively inside embed_frames.
