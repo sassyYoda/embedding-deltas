@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Roadmap created; awaiting `/gsd-plan-phase 1`
-last_updated: "2026-05-06T18:39:15.126Z"
+status: Phase 1 complete (extract.py + utils.py + §0.5 verification fixture); ready for `/gsd-plan-phase 2`
+last_updated: "2026-05-06T20:02:30.161Z"
 progress:
   total_phases: 6
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  completed_phases: 1
+  total_plans: 2
+  completed_plans: 2
+  percent: 100
 ---
 
 # State: Body Cam Highlight Reel — AbelPolice Take-Home
@@ -27,10 +27,10 @@ progress:
 ## Current Position
 
 - **Milestone:** v1 (initial submission)
-- **Phase:** 1 — Frame Extraction & Embeddings
-- **Plan:** TBD (Phase 1 not yet planned)
-- **Status:** Roadmap created; awaiting `/gsd-plan-phase 1`
-- **Progress:** 0/6 phases complete `[░░░░░░] 0%`
+- **Phase:** 1 — Frame Extraction & Embeddings (COMPLETE)
+- **Next phase:** 2 — Signal Processing
+- **Status:** Phase 1 complete; canonical (timestamps, embeddings) fixture written to output/cache/. Ready for `/gsd-plan-phase 2`.
+- **Progress:** 1/6 phases complete `[█▓░░░░░░░░] ~17%`
 
 ---
 
@@ -38,13 +38,20 @@ progress:
 
 | Metric | Value |
 |--------|-------|
-| Phases planned | 0 / 6 |
-| Phases complete | 0 / 6 |
+| Phases planned | 1 / 6 |
+| Phases complete | 1 / 6 |
 | Requirements mapped | 51 / 51 ✓ |
-| Plans executed | 0 |
+| Requirements complete | 17 / 51 (ENV-01..04, EXTR-01..05, EMBD-01..06) |
+| Plans executed | 2 (01-01 + 01-02) |
 | Sample videos processed end-to-end | 0 / 5 |
+| Phase 01 §0.5 harness wall-clock (mps, JT 19-min video) | 615.25 s real / 542.68 s user |
 
----
+### Plan Execution
+
+| Plan | Duration (min) | Tasks | Files |
+|------|----------------|-------|-------|
+| Phase 01 P01 | ~5 | 2 | 7 |
+| Phase 01 P02 | ~12 | 2 | 1 |
 
 ## Accumulated Context
 
@@ -70,14 +77,20 @@ progress:
 
 ### Open Todos / Watch Items
 
-- [ ] Phase 1: probe sample videos with `ffprobe -show_streams` to confirm CFR vs VFR before locking sampling code path (research flag).
+- [x] Phase 1: probe sample videos with `ffprobe -show_streams` to confirm CFR vs VFR — done by `utils.probe_video_metadata`; `justin_timberlake.mp4` is_vfr=False; sampling code path is VFR-safe regardless (D-06).
+- [ ] **Phase 1 follow-up (DEVIATION REQUIRED):** open_clip 3.3.0 emits `QuickGELU mismatch` UserWarning when calling `create_model_and_transforms('ViT-L-14', pretrained='openai')` per D-09 verbatim. Spec §2 mandates the QuickGELU variant. CONTEXT amendment territory: pick option 1 (rename to `'ViT-L-14-quickgelu'`), option 2 (keep D-09 as-is, accept warning), or option 3 (`force_quick_gelu=True`). Re-emit fixtures if the model changes. See 01-02-SUMMARY.md "Open Issue".
 - [ ] Phase 4: one-spike concat-demuxer test on a real extracted clip from sample video 1 to confirm fallback path expectations (research flag).
 - [ ] Phase 5: choose representative video for parameter tuning by watching all 5 raw videos and picking the one with broadest dynamic range.
 - [ ] Phase 6: README must lean into qualitative per-video writeup; resist inventing quantitative numbers.
 
+### Decisions (added during execution)
+
+- **Plan 01-02:** Honored D-09 verbatim ('ViT-L-14' + pretrained='openai'); flagged QuickGELU mismatch UserWarning as a CONTEXT amendment for the user before fixtures propagate to Phase 2.
+- **Plan 01-02:** MPS bit-identical rerun (D-17) PASSED on first call without explicit warm-up — RESEARCH A5's documented warm-up batch fallback is NOT needed for Phase 1.
+
 ### Blockers
 
-None — roadmap is approved-shape; ready to plan Phase 1.
+None — Phase 1 §0.5 verification PASSED end-to-end on `videos/justin_timberlake.mp4`; canonical fixture is on disk under `output/cache/`. The QuickGELU question is a flagged open issue but does not block Phase 2 planning (Phase 2 develops against the fixture; if the user picks option 1 or 3, the fixture is regenerated and Phase 2 simply reloads it).
 
 ---
 
@@ -85,22 +98,23 @@ None — roadmap is approved-shape; ready to plan Phase 1.
 
 **Last session (2026-05-06):**
 
-- Initialized PROJECT.md, REQUIREMENTS.md (51 v1 reqs), and full research bundle (SUMMARY, ARCHITECTURE, PITFALLS).
-- Created ROADMAP.md with 6 coarse-grained phases mapping all 51 requirements; locked cross-cutting invariants.
-- Created STATE.md (this file).
+- Executed Plan 01-02 (extract.py + §0.5 harness) end-to-end. Two atomic commits: `d99fd32` (Task 1: sample_frames + load_model + embed_frames) and `40a1e28` (Task 2: __main__ harness with ffmpeg precondition + bit-identical rerun + fixture writer).
+- Ran §0.5 verification on `videos/justin_timberlake.mp4` (1134.144s, h264, 1280x720, CFR): 2269 frames sampled, embeddings (2269, 768) float32 L2-normalized, drift 0.144s, [determinism] PASS on MPS without warm-up. Wall-clock 615s.
+- Wrote fixtures `output/cache/justin_timberlake_{embeddings,timestamps}.npy` for Phase 2 parallel development.
+- Marked complete: ENV-02, EXTR-01..05, EMBD-01..06 (12 reqs).
+- Flagged QuickGELU mismatch UserWarning from open_clip 3.3.0 as CONTEXT-amendment territory before Phase 2.
 
-**Next action:** `/gsd-plan-phase 1` to decompose Phase 1 (Frame Extraction & Embeddings) into executable plans against the spec §0.5 verification gates and the 8 frame/embedding pitfalls.
+**Next action:** `/gsd-plan-phase 2` to decompose Phase 2 (Signal Processing) — `signal_processing.py` deltas/medfilt/MAD/PELT against the Phase 1 fixture. **Before planning, resolve the QuickGELU open issue** so Phase 2 doesn't lock in stale embeddings.
 
 **Recent files touched:**
 
-- `.planning/PROJECT.md`
-- `.planning/REQUIREMENTS.md`
-- `.planning/research/SUMMARY.md`
-- `.planning/research/ARCHITECTURE.md`
-- `.planning/research/PITFALLS.md`
-- `.planning/ROADMAP.md` (this session)
-- `.planning/STATE.md` (this session)
+- `extract.py` (created Task 1; appended Task 2)
+- `output/cache/justin_timberlake_embeddings.npy` (new)
+- `output/cache/justin_timberlake_timestamps.npy` (new)
+- `.planning/phases/01-frame-extraction-embeddings/01-02-SUMMARY.md` (new)
+- `.planning/STATE.md` (this update)
+- `.planning/REQUIREMENTS.md` (12 checkboxes ticked)
 
 ---
 
-*Last updated: 2026-05-06 after roadmap creation*
+*Last updated: 2026-05-06 after Plan 01-02 execution*

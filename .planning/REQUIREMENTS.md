@@ -10,26 +10,38 @@
 ### Environment & Project Structure
 
 - [ ] **ENV-01**: Project provides a pinned `requirements.txt` covering `torch`, `torchvision`, `open_clip_torch`, `opencv-python`, `numpy`, `scipy`, `ruptures`, `tqdm` (per spec §1, with `ffmpeg-python` dropped per research)
-- [ ] **ENV-02**: Project verifies system `ffmpeg` is installed and on PATH at startup
+- [x] **ENV-02
+**: Project verifies system `ffmpeg` is installed and on PATH at startup
 - [ ] **ENV-03**: Project layout matches spec §1 exactly: `pipeline.py`, `extract.py`, `signal_processing.py`, `clip_selection.py`, `export.py`, `utils.py`, `videos/`, `output/{reels,clips,timestamps}/`
 - [ ] **ENV-04**: Code runs on Python 3.11+ with no GPU-specific code paths (device selection deferred to `open_clip` / torch defaults)
 
 ### Frame Extraction
 
-- [ ] **EXTR-01**: `extract.sample_frames(video_path, fps=2.0)` samples one frame every 0.5 seconds from the input video
-- [ ] **EXTR-02**: Sampled frames are returned as RGB (BGR-to-RGB conversion verified)
-- [ ] **EXTR-03**: Per-frame timestamps are recorded as float seconds, derived from actual playback position (not nominal frame index, to handle VFR body-cam encodings — pitfall research)
-- [ ] **EXTR-04**: Video duration is sourced via `ffprobe` (not `cv2.CAP_PROP_FRAME_COUNT`, which is unreliable on body-cam MP4s — pitfall research)
-- [ ] **EXTR-05**: §0.5 verification: number of sampled frames printed; first 5 timestamps printed and asserted to be 0.5 s apart
+- [x] **EXTR-01
+**: `extract.sample_frames(video_path, fps=2.0)` samples one frame every 0.5 seconds from the input video
+- [x] **EXTR-02
+**: Sampled frames are returned as RGB (BGR-to-RGB conversion verified)
+- [x] **EXTR-03
+**: Per-frame timestamps are recorded as float seconds, derived from actual playback position (not nominal frame index, to handle VFR body-cam encodings — pitfall research)
+- [x] **EXTR-04
+**: Video duration is sourced via `ffprobe` (not `cv2.CAP_PROP_FRAME_COUNT`, which is unreliable on body-cam MP4s — pitfall research)
+- [x] **EXTR-05
+**: §0.5 verification: number of sampled frames printed; first 5 timestamps printed and asserted to be 0.5 s apart
 
 ### Embedding Extraction
 
-- [ ] **EMBD-01**: Model is loaded via `open_clip.create_model_and_transforms('ViT-L-14', pretrained='openai')` — no substitution
-- [ ] **EMBD-02**: `model.eval()` and `torch.inference_mode()` (or `torch.no_grad()`) wrap all inference
-- [ ] **EMBD-03**: Frames are processed in batches of 32
-- [ ] **EMBD-04**: Output embeddings have shape `(N, 768)` and dtype `float32`
-- [ ] **EMBD-05**: Embeddings are explicitly L2-normalized; an assertion (`np.allclose(np.linalg.norm(emb, axis=1), 1.0, atol=1e-5)`) guards against silent unnormalized output
-- [ ] **EMBD-06**: §0.5 verification: embeddings shape and L2-norm assertion both pass at the end of `extract.py`
+- [x] **EMBD-01
+**: Model is loaded via `open_clip.create_model_and_transforms('ViT-L-14', pretrained='openai')` — no substitution
+- [x] **EMBD-02
+**: `model.eval()` and `torch.inference_mode()` (or `torch.no_grad()`) wrap all inference
+- [x] **EMBD-03
+**: Frames are processed in batches of 32
+- [x] **EMBD-04
+**: Output embeddings have shape `(N, 768)` and dtype `float32`
+- [x] **EMBD-05
+**: Embeddings are explicitly L2-normalized; an assertion (`np.allclose(np.linalg.norm(emb, axis=1), 1.0, atol=1e-5)`) guards against silent unnormalized output
+- [x] **EMBD-06
+**: §0.5 verification: embeddings shape and L2-norm assertion both pass at the end of `extract.py`
 
 ### Signal Processing — Deltas
 
