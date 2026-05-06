@@ -160,3 +160,231 @@ def detect_changepoints(smoothed: np.ndarray, penalty: float = 3.0) -> list[int]
     model = rpt.Pelt(model="rbf").fit(smoothed.reshape(-1, 1))
     changepoints = model.predict(pen=penalty)[:-1]  # drop trailing len(signal)
     return [int(cp) for cp in changepoints]
+
+
+if __name__ == "__main__":
+    # Spec §0.5 verification harness for Phase 2 (D-34). Runs as:
+    #   python signal_processing.py [<video_name>] [--save-fixture | --no-save-fixture] [--pelt]
+    # Mirrors extract.py's __main__ pattern verbatim per D-34 / Phase 1 D-16.
+    import argparse
+    import sys
+
+    parser = argparse.ArgumentParser(
+        description=(
+            "Phase 2 §0.5 verification harness for signal_processing.py "
+            "(D-34: inline __main__ — no separate test scaffolding per D-34 / Phase 1 D-16)."
+        )
+    )
+    parser.add_argument(
+        "video",
+        nargs="?",
+        default=None,
+        help=(
+            "Video name stem (e.g. 'justin_timberlake'). If omitted, picks the "
+            "most-recent *_embeddings.npy under output/cache/."
+        ),
+    )
+    parser.add_argument(
+        "--save-fixture",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help=(
+            "Write output/cache/{video}_scores.npy (and _changepoints.npy with --pelt). "
+            "Default ON; pass --no-save-fixture to skip."
+        ),
+    )
+    parser.add_argument(
+        "--pelt",
+        action="store_true",
+        default=False,
+        help=(
+            "Run detect_changepoints (lazy-imports ruptures). Off by default — "
+            "verifies the lazy-import contract (D-32)."
+        ),
+    )
+    args = parser.parse_args()
+
+    cache = Path("output/cache")
+
+    # ── Step 0: resolve video stem (smart default) ─────────────────────────────
+    if args.video is None:
+        candidates = sorted(
+            cache.glob("*_embeddings.npy"),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
+        )
+        if not candidates:
+            print(
+                "[FATAL] no *_embeddings.npy found under output/cache/. "
+                "Run `python extract.py <video.mp4>` first.",
+                file=sys.stderr,
+            )
+            sys.exit(2)
+        # Strip the trailing "_embeddings" from the stem to recover the video name.
+        video_name = candidates[0].stem.removesuffix("_embeddings")
+        print(f"[auto] using fixture: {video_name}")
+    else:
+        video_name = args.video
+
+    # ── Step 1: load fixtures ──────────────────────────────────────────────────
+    emb_path = cache / f"{video_name}_embeddings.npy"
+    ts_path = cache / f"{video_name}_timestamps.npy"
+    if not emb_path.exists() or not ts_path.exists():
+        print(
+            f"[FATAL] missing fixture: {emb_path} or {ts_path}. "
+            "Run `python extract.py <video.mp4>` to produce it.",
+            file=sys.stderr,
+        )
+        sys.exit(2)
+    embeddings = np.load(emb_path)  # (N, 768) float32
+    timestamps = np.load(ts_path)   # (N,) float64
+    print(
+        f"[fixture] loaded {video_name}: "
+        f"embeddings={embeddings.shape} timestamps={timestamps.shape}"
+    )
+
+    # ── Step 2: compute_deltas + §0.5 print 1 (D-26) ───────────────────────────
+    deltas = compute_deltas(embeddings)
+    assert len(deltas) == len(embeddings) - 1, (
+        f"len mismatch: {len(deltas)} vs {len(embeddings) - 1}"
+    )
+    assert deltas.min() >= 0.0 and deltas.max() <= 2.0, (
+        f"deltas out of [0, 2]: [{deltas.min()}, {deltas.max()}]"
+    )
+    print(f"[deltas] first 20: {deltas[:20].tolist()}")
+    print(
+        f"[deltas] len={len(deltas)} "
+        f"min={deltas.min():.6f} max={deltas.max():.6f} mean={deltas.mean():.6f}"
+    )
+
+    # ── Step 3: smooth_deltas + spike-injection synthetic (D-28 / Pitfall 9) ───
+    smoothed = smooth_deltas(deltas)
+    diff = smoothed - deltas
+    print(
+        f"[smoothed] (smoothed-raw) "
+        f"min={diff.min():.6f} max={diff.max():.6f} mean={diff.mean():.6f}"
+    )
+    # Pitfall 9 spike-injection: inject +0.5 at index 100 in zeros, confirm smoothed[100]==0
+    synth_z = np.zeros(200)
+    synth_z[100] = 0.5
+    synth_smoothed = smooth_deltas(synth_z)
+    assert synth_smoothed[100] == 0.0, (
+        f"[smoothed] spike at idx 100 not eliminated: got {synth_smoothed[100]} "
+        "(Pitfall 9)"
+    )
+    # Edge-preservation (Pitfall 9): mode='reflect' preserves edges of constant signal
+    edge_test = np.full(10, 7.0)
+    edge_smoothed = smooth_deltas(edge_test)
+    assert edge_smoothed[0] == 7.0 and edge_smoothed[-1] == 7.0, (
+        f"[smoothed] edge dip — wrong boundary mode (Pitfall 9): "
+        f"edges=({edge_smoothed[0]}, {edge_smoothed[-1]})"
+    )
+    print("[smoothed] spike-injection PASS  edge-preservation PASS")
+
+    # ── Step 4: mad_normalize + §0.5 print 3 (D-30 / Pitfall 10) ───────────────
+    scores = mad_normalize(smoothed, window_samples=180)
+    # Pitfall 10 diagnostic: count windows where the MAD-floor branch actually
+    # fired (mad <= 1e-3), NOT total zeros. Zeros also include negative scores
+    # that the [0, 10] clip floors, which is correct behavior — only the
+    # zero-MAD branch firing indicates static-footage poisoning the signal.
+    half = 180 // 2
+    zero_mad_branch = 0
+    for i in range(len(smoothed)):
+        lo = max(0, i - half)
+        hi = min(len(smoothed), i + half)
+        local = smoothed[lo:hi]
+        if float(median_abs_deviation(local, scale=1.0)) <= 1e-3:
+            zero_mad_branch += 1
+    zero_mad_pct = 100.0 * zero_mad_branch / len(scores)
+    above_3_pct = 100.0 * (scores > 3.0).sum() / len(scores)
+    print(
+        f"[scores] min={scores.min():.4f} max={scores.max():.4f} "
+        f"mean={scores.mean():.4f}"
+    )
+    print(
+        f"[scores] zero-MAD: {zero_mad_branch}/{len(scores)} "
+        f"({zero_mad_pct:.2f}%); above 3.0: {above_3_pct:.2f}%"
+    )
+    assert scores.max() >= 2.0, (
+        f"[scores] max={scores.max():.4f} < 2.0 — window too large or signal too flat (D-30)"
+    )
+    assert above_3_pct < 90.0, (
+        f"[scores] {above_3_pct:.2f}% > 90% above 3.0 — window too small (D-30)"
+    )
+    assert zero_mad_pct < 5.0, (
+        f"[scores] zero-MAD {zero_mad_pct:.2f}% > 5% — static-footage dominating (Pitfall 10)"
+    )
+    assert scores.min() >= 0.0 and scores.max() <= 10.0, (
+        f"[scores] not clipped to [0, 10]: [{scores.min()}, {scores.max()}]"
+    )
+
+    # ── Step 5: synthetic alignment test (D-25 / Pitfall 8 — THE answer to spec §4) ──
+    # Build (K, 768) two-color fixture: rows 0..K-1 = unit vector e_0,
+    # rows K..end = unit vector e_1. Cosine delta is 0 except at score-index K-1
+    # where it's 1.0. Smoothing CAN attenuate a single isolated spike under k=5
+    # median, so we assert the alignment invariant against the RAW deltas argmax —
+    # this is the locked behavior per Pitfall 8 / plan-checker (the helper's
+    # correctness is what's being verified, not whether smoothing preserves a
+    # single-sample event).
+    K = 7   # transition at frame 7
+    N_synth = 14
+    e_a = np.zeros(768, dtype=np.float32); e_a[0] = 1.0
+    e_b = np.zeros(768, dtype=np.float32); e_b[1] = 1.0
+    synth_emb = np.stack([e_a] * K + [e_b] * (N_synth - K))  # (14, 768)
+    synth_ts = np.arange(N_synth, dtype=np.float64) * 0.5    # 2 fps timestamps
+    # Round-trip through compute_deltas → smooth_deltas (smoothing attenuation
+    # of the K=7 single-sample spike is intentional and documented).
+    synth_deltas = compute_deltas(synth_emb)                 # (13,)
+    _synth_smoothed = smooth_deltas(synth_deltas)            # (13,) — k=5 median attenuates the spike
+    # Align against the raw-deltas peak (Pitfall 8 alignment invariant):
+    peak_idx = int(np.argmax(synth_deltas))
+    assert peak_idx == K - 1, (
+        f"[alignment] peak at {peak_idx}, expected {K - 1} (Pitfall 8)"
+    )
+    peak_ts = score_index_to_timestamp(peak_idx, synth_ts)
+    expected_ts = K * 0.5  # frame K is the first 'arrived at' frame of color B
+    assert abs(peak_ts - expected_ts) < 1e-9, (
+        f"[alignment] ts={peak_ts} expected={expected_ts} "
+        f"delta={abs(peak_ts - expected_ts)} (ε=1e-9)"
+    )
+    print(
+        f"[alignment] PASS  peak at score-idx {peak_idx} → ts {peak_ts}s "
+        f"(expected {expected_ts}s)"
+    )
+
+    # ── Step 6: lazy-import verification (D-32 / Pitfall enforcement) ──────────
+    assert "ruptures" not in sys.modules, (
+        "[lazy-import] ruptures was loaded without --pelt — D-32 violated"
+    )
+    print("[lazy-import] PELT clean  ('ruptures' not in sys.modules)")
+
+    # ── Step 7: optional --pelt branch (D-32, D-33) ────────────────────────────
+    changepoints = None
+    if args.pelt:
+        changepoints = detect_changepoints(smoothed, penalty=3.0)
+        assert "ruptures" in sys.modules, (
+            "[lazy-import] --pelt set but ruptures still not loaded — bug in detect_changepoints"
+        )
+        assert isinstance(changepoints, list) and all(
+            isinstance(c, int) for c in changepoints
+        ), (
+            f"[pelt] return type wrong: {type(changepoints)} of "
+            f"{type(changepoints[0]) if changepoints else None}"
+        )
+        print(f"[pelt] {len(changepoints)} changepoints; first 10: {changepoints[:10]}")
+
+    # ── Step 8: write fixture (D-35) ───────────────────────────────────────────
+    if args.save_fixture:
+        from utils import ensure_output_dirs
+        paths = ensure_output_dirs(video_name)
+        cache_dir = paths["cache"]
+        scores_path = cache_dir / f"{video_name}_scores.npy"
+        np.save(scores_path, scores.astype(np.float64))
+        print(f"[fixture] wrote {scores_path}")
+        if args.pelt and changepoints is not None:
+            cp_path = cache_dir / f"{video_name}_changepoints.npy"
+            np.save(cp_path, np.asarray(changepoints, dtype=np.int64))
+            print(f"[fixture] wrote {cp_path}")
+
+    # ── Step 9: final banner ───────────────────────────────────────────────────
+    print("Phase 2 §0.5 verification: PASS")
