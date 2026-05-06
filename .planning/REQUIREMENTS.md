@@ -139,7 +139,7 @@ Deferred — could improve the prototype but not required for the assignment.
 
 ## Traceability
 
-Populated during roadmap creation.
+Confirmed by roadmap creation (2026-05-06). Every v1 requirement is mapped to exactly one phase.
 
 | Requirement | Phase | Status |
 |---|---|---|
@@ -147,25 +147,73 @@ Populated during roadmap creation.
 | ENV-02 | Phase 1 | Pending |
 | ENV-03 | Phase 1 | Pending |
 | ENV-04 | Phase 1 | Pending |
-| EXTR-01..05 | Phase 1 | Pending |
-| EMBD-01..06 | Phase 1 | Pending |
-| SIGD-01..03 | Phase 2 | Pending |
-| SIGS-01..02 | Phase 2 | Pending |
-| SIGM-01..04 | Phase 2 | Pending |
-| SIGP-01..03 | Phase 2 | Pending |
-| SELP-01..04 | Phase 3 | Pending |
-| SELB-01..06 | Phase 3 | Pending |
-| EXPC-01..03 | Phase 4 | Pending |
-| ORCH-01..04 | Phase 5 | Pending |
-| JSON-01..04 | Phase 5 | Pending |
-| RUN-01..03 | Phase 6 | Pending |
-| DOC-01..03 | Phase 6 | Pending |
+| EXTR-01 | Phase 1 | Pending |
+| EXTR-02 | Phase 1 | Pending |
+| EXTR-03 | Phase 1 | Pending |
+| EXTR-04 | Phase 1 | Pending |
+| EXTR-05 | Phase 1 | Pending |
+| EMBD-01 | Phase 1 | Pending |
+| EMBD-02 | Phase 1 | Pending |
+| EMBD-03 | Phase 1 | Pending |
+| EMBD-04 | Phase 1 | Pending |
+| EMBD-05 | Phase 1 | Pending |
+| EMBD-06 | Phase 1 | Pending |
+| SIGD-01 | Phase 2 | Pending |
+| SIGD-02 | Phase 2 | Pending |
+| SIGD-03 | Phase 2 | Pending |
+| SIGS-01 | Phase 2 | Pending |
+| SIGS-02 | Phase 2 | Pending |
+| SIGM-01 | Phase 2 | Pending |
+| SIGM-02 | Phase 2 | Pending |
+| SIGM-03 | Phase 2 | Pending |
+| SIGM-04 | Phase 2 | Pending |
+| SIGP-01 | Phase 2 | Pending |
+| SIGP-02 | Phase 2 | Pending |
+| SIGP-03 | Phase 2 | Pending |
+| SELP-01 | Phase 3 | Pending |
+| SELP-02 | Phase 3 | Pending |
+| SELP-03 | Phase 3 | Pending |
+| SELP-04 | Phase 3 | Pending |
+| SELB-01 | Phase 3 | Pending |
+| SELB-02 | Phase 3 | Pending |
+| SELB-03 | Phase 3 | Pending |
+| SELB-04 | Phase 3 | Pending |
+| SELB-05 | Phase 3 | Pending |
+| SELB-06 | Phase 3 | Pending |
+| EXPC-01 | Phase 4 | Pending |
+| EXPC-02 | Phase 4 | Pending |
+| EXPC-03 | Phase 4 | Pending |
+| ORCH-01 | Phase 5 | Pending |
+| ORCH-02 | Phase 5 | Pending |
+| ORCH-03 | Phase 5 | Pending |
+| ORCH-04 | Phase 5 | Pending |
+| JSON-01 | Phase 5 | Pending |
+| JSON-02 | Phase 5 | Pending |
+| JSON-03 | Phase 5 | Pending |
+| JSON-04 | Phase 5 | Pending |
+| DOC-03 | Phase 5 | Pending |
+| RUN-01 | Phase 6 | Pending |
+| RUN-02 | Phase 6 | Pending |
+| RUN-03 | Phase 6 | Pending |
+| DOC-01 | Phase 6 | Pending |
+| DOC-02 | Phase 6 | Pending |
 
 **Coverage:**
 - v1 requirements: 51 total
-- Mapped to phases: 51 (all assigned to a candidate phase; will be confirmed by roadmapper)
-- Unmapped: 0 ✓ (pending roadmapper confirmation)
+- Mapped to phases: 51 ✓
+- Unmapped: 0 ✓
+- Duplicates: 0 ✓
+
+**Phase distribution:**
+- Phase 1 (Frame Extraction & Embeddings): 15 requirements
+- Phase 2 (Signal Processing): 12 requirements
+- Phase 3 (Clip Selection): 10 requirements
+- Phase 4 (Export): 3 requirements
+- Phase 5 (Orchestration & First-Video End-to-End): 9 requirements
+- Phase 6 (Multi-Video Run & Submission Polish): 5 requirements
+
+**Note on DOC-03:** Tuning + freezing parameters is the gate that lets Phase 6 begin, so DOC-03 lives in Phase 5 (where the work happens). DOC-01/02 (README narrative) are written in Phase 6 and reference the values frozen in Phase 5.
 
 ---
 *Requirements defined: 2026-05-06*
-*Last updated: 2026-05-06 after auto-mode initialization (sourced from spec §0–§12)*
+*Last updated: 2026-05-06 after roadmap creation — traceability confirmed*
