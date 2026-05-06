@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: completed
-last_updated: "2026-05-06T20:46:56.292Z"
+last_updated: "2026-05-06T21:19:17Z"
 progress:
   total_phases: 6
-  completed_phases: 2
-  total_plans: 3
-  completed_plans: 3
+  completed_phases: 3
+  total_plans: 4
+  completed_plans: 4
   percent: 100
 ---
 
@@ -18,7 +18,7 @@ progress:
 
 **Core Value:** Given a body cam video, produce a highlight reel where selected moments visibly correspond to high-action or significant scene changes — using only visual embedding signal — reproducibly across all five sample videos with one fixed parameter set.
 
-**Current Focus:** Phase 2 — Signal Processing. COMPLETE 2026-05-06 (Plan 02-01); `signal_processing.py` ships compute_deltas/smooth_deltas/mad_normalize/detect_changepoints/score_index_to_timestamp + §0.5 harness. Phase 3 dev fixture `output/cache/justin_timberlake_scores.npy` (2268,) float64 on disk.
+**Current Focus:** Phase 3 — Clip Selection. COMPLETE 2026-05-06 (Plan 03-01); `clip_selection.py` ships select_peaks / apply_pelt_boost / compute_budget_seconds / compute_padding / build_clips / merge_clips / enforce_budget + §0.5 harness. Phase 4 dev fixture `output/cache/justin_timberlake_final_clips.json` (4 clips, total=37.805s = 100% of budget) on disk.
 
 **Locked spec:** `assignment-details/bodycam_highlight_reel_spec.md` is the single source of truth. Every implementation decision traces to a numbered section there.
 
@@ -27,10 +27,10 @@ progress:
 ## Current Position
 
 - **Milestone:** v1 (initial submission)
-- **Phase:** 2 — Signal Processing (COMPLETE)
-- **Next phase:** 3 — Clip Selection
-- **Status:** Phase 2 complete; signal_processing.py ships 5 functions + §0.5 harness; `output/cache/justin_timberlake_scores.npy` (2268,) float64 on disk for Phase 3 dev. Ready for `/gsd-plan-phase 3`.
-- **Progress:** 2/6 phases complete `[███▓░░░░░░] ~33%`
+- **Phase:** 3 — Clip Selection (COMPLETE)
+- **Next phase:** 4 — Export
+- **Status:** Phase 3 complete; clip_selection.py ships 7 functions + §0.5 harness; `output/cache/justin_timberlake_final_clips.json` (4 clips, total=37.805s of 37.805s budget) on disk for Phase 4 dev. Ready for `/gsd-plan-phase 4`.
+- **Progress:** 3/6 phases complete `[█████░░░░░] 50%`
 
 ---
 
@@ -38,14 +38,15 @@ progress:
 
 | Metric | Value |
 |--------|-------|
-| Phases planned | 2 / 6 |
-| Phases complete | 2 / 6 |
+| Phases planned | 3 / 6 |
+| Phases complete | 3 / 6 |
 | Requirements mapped | 51 / 51 ✓ |
-| Requirements complete | 29 / 51 (ENV-01..04, EXTR-01..05, EMBD-01..06, SIGD-01..03, SIGS-01..02, SIGM-01..04, SIGP-01..03) |
-| Plans executed | 3 (01-01 + 01-02 + 02-01) |
+| Requirements complete | 39 / 51 (ENV-01..04, EXTR-01..05, EMBD-01..06, SIGD-01..03, SIGS-01..02, SIGM-01..04, SIGP-01..03, SELP-01..04, SELB-01..06) |
+| Plans executed | 4 (01-01 + 01-02 + 02-01 + 03-01) |
 | Sample videos processed end-to-end | 0 / 5 |
 | Phase 01 §0.5 harness wall-clock (mps, JT 19-min video) | 615.25 s real / 542.68 s user |
 | Phase 02 §0.5 harness wall-clock (numpy/scipy, JT 2,269-frame fixture) | 0.49 s real |
+| Phase 03 §0.5 harness wall-clock (numpy/scipy + ffprobe, JT 2,268-score fixture) | 2.27 s real |
 
 ### Plan Execution
 
@@ -54,6 +55,7 @@ progress:
 | Phase 01 P01 | ~5 | 2 | 7 |
 | Phase 01 P02 | ~12 | 2 | 1 |
 | Phase 02 P01 | ~25 | 2 | 1 (signal_processing.py replaces stub; 2 fixture .npy written under output/cache/) |
+| Phase 03 P01 | ~6 | 2 | 1 (clip_selection.py replaces stub; 1 fixture .json written under output/cache/) |
 
 ## Accumulated Context
 
@@ -92,6 +94,8 @@ progress:
 - **Plan 02-01:** D-22 dtype contract enforced via explicit `np.sum(..., dtype=np.float64)` — numpy 2.x no longer auto-upcasts float32-axis-reductions to float64.
 - **Plan 02-01:** Pitfall 10 §0.5 diagnostic refined to count zero-MAD-branch firings (NOT total zero scores), since the [0,10] clip floors negatives to 0 — different concern.
 - **Plan 02-01:** Synthetic two-color alignment test (D-25) asserts on RAW-deltas argmax (k=5 median attenuates a single-sample spike — intentional per plan-checker; the helper's correctness is what's verified).
+- **Plan 03-01:** Module docstring originally contained the literal string `timestamps[idx + 1]` to describe the grep ban; this tripped its own grep guard. Rephrased to `timestamps[k + 1]` style (k not idx/i) so the ban is described without violating it. No behavior change.
+- **Plan 03-01:** JT signal at default `--height=1.5` produces 40 raw peaks in 1134s of video; the 37.805s budget admits exactly 4 of them at default padding=5.671s (with one partial centered on `peak_time=751.484s`). Total fills budget at 100.0%, no overlaps, all clips satisfy `start <= peak_time <= end`.
 
 ### Blockers
 
@@ -103,24 +107,24 @@ None — Phase 1 §0.5 verification PASSED end-to-end on `videos/justin_timberla
 
 **Last session (2026-05-06):**
 
-- Executed Plan 02-01 (signal_processing.py + §0.5 harness) end-to-end. Two atomic commits: `5d3f3f4` (Task 1: 5 core functions, replaces stub) and `baf798b` (Task 2: 9-step __main__ harness + JT scores fixture writer).
-- Ran §0.5 harness on `output/cache/justin_timberlake_{embeddings,timestamps}.npy` (2,269 frames): deltas (2268,) float64 in [0.0056, 0.4806], smoothed spike-injection PASS, edge-preservation PASS, MAD scores in [0.0, 10.0] mean 0.7577, zero-MAD-branch 0.00%, alignment test PASS (peak idx 6 → ts 3.5s within ε=1e-9), lazy-import contract PASS, --pelt round-trip 86 changepoints. Wall-clock 0.49s.
-- Wrote fixture `output/cache/justin_timberlake_scores.npy` (2268,) float64 for Phase 3 parallel development; optional `output/cache/justin_timberlake_changepoints.npy` written when --pelt.
-- Marked complete: SIGD-01..03, SIGS-01..02, SIGM-01..04, SIGP-01..03 (12 reqs).
-- All ROADMAP §2 SC1–SC5 PASS with concrete numbers reproduced in 02-01-SUMMARY.md.
+- Executed Plan 03-01 (clip_selection.py + §0.5 harness) end-to-end. Two atomic commits: `ce893b0` (Task 1: 7 core functions, replaces stub) and `7a05624` (Task 2: 10-step __main__ harness + JT final_clips.json fixture writer).
+- Ran §0.5 harness on `output/cache/justin_timberlake_{scores,timestamps}.npy` + `videos/justin_timberlake.mp4` (1134.144s duration): 40 peaks @ height=1.5 (top score 10.0 at idx=1812 / 906.506s), budget=37.805s, padding=5.671s, build → 40 candidate clips, merge → 40 (no merges within 3s gap), enforce_budget → 4 final clips (3 full + 1 partial at index 2 centered on peak_time=751.484s, 3.78s wide), total=37.805s = 100.0% of budget, all alignment invariants hold, no overlaps, synthetic embedded test PASS, lazy-import contract PASS, --pelt path verified PASS. Wall-clock 2.27s.
+- Wrote fixture `output/cache/justin_timberlake_final_clips.json` (4 clips, dev-time for Phase 4); gitignored.
+- Marked complete: SELP-01..04, SELB-01..06 (10 reqs).
+- All ROADMAP §3 SC1–SC5 PASS with concrete numbers reproduced in 03-01-SUMMARY.md.
+- Pitfalls 18 (partial-clip centered on peak_time), 19 (peak_time threading through merge with hard assert), 20 (find_peaks distance in samples not seconds) all neutralized; runtime guards fire on synthetic + JT fixtures.
 
-**Next action:** `/gsd-plan-phase 3` to decompose Phase 3 (Clip Selection) — `clip_selection.py` find_peaks → adaptive padding → merge → budget enforcement. Phase 3 imports `score_index_to_timestamp` from `signal_processing` (single index→seconds site — DO NOT inline `timestamps[idx+1]` per Pitfall 8). Develops against the JT scores fixture for fast iteration without re-running CLIP.
+**Next action:** `/gsd-plan-phase 4` to decompose Phase 4 (Export) — `export.py` ffmpeg `-c copy` cut + concat demuxer with re-encode fallback. Phase 4 consumes Phase 3's `output/cache/{video}_final_clips.json` schema (one tuple per ffmpeg invocation). Develops against the JT fixture without re-running CLIP/scoring.
 
 **Recent files touched:**
 
-- `signal_processing.py` (replaced stub with 5 functions + 9-step __main__ harness)
-- `output/cache/justin_timberlake_scores.npy` (new, gitignored)
-- `output/cache/justin_timberlake_changepoints.npy` (new when --pelt, gitignored)
-- `.planning/phases/02-signal-processing/02-01-SUMMARY.md` (new)
+- `clip_selection.py` (replaced stub with 7 functions + 10-step __main__ harness)
+- `output/cache/justin_timberlake_final_clips.json` (new, gitignored)
+- `.planning/phases/03-clip-selection/03-01-SUMMARY.md` (new)
 - `.planning/STATE.md` (this update)
-- `.planning/REQUIREMENTS.md` (12 checkboxes ticked)
-- `.planning/ROADMAP.md` (Phase 2 mark complete)
+- `.planning/REQUIREMENTS.md` (10 checkboxes ticked)
+- `.planning/ROADMAP.md` (Phase 3 mark complete)
 
 ---
 
-*Last updated: 2026-05-06 after Plan 02-01 execution*
+*Last updated: 2026-05-06 after Plan 03-01 execution*

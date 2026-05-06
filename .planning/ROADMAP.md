@@ -29,7 +29,7 @@ These hold across all phases and are referenced explicitly where they lock:
 
 - [x] **Phase 1: Frame Extraction & Embeddings** — `extract.py` + utils video-metadata helpers; produce the canonical `(timestamps, embeddings)` fixture from one sample video, with all 8 frame/embedding pitfalls neutralized. **DONE 2026-05-06** — verified on `videos/justin_timberlake.mp4` (615s on MPS); fixture at `output/cache/justin_timberlake_{embeddings,timestamps}.npy`.
 - [x] **Phase 2: Signal Processing** — `signal_processing.py` deltas/median/MAD on Phase-1 fixture; lock the timestamp-alignment invariant with a synthetic test; lazy-import PELT as opt-in. **DONE 2026-05-06** — 5 functions + §0.5 harness PASS in 0.49 s on JT (2,269-frame fixture); `output/cache/justin_timberlake_scores.npy` (2268,) float64 written; SC1–SC5 all PASS.
-- [ ] **Phase 3: Clip Selection** — `clip_selection.py` peaks/padding/build/merge/budget; the single index→seconds conversion site; thread `peak_time` through merge.
+- [x] **Phase 3: Clip Selection** — `clip_selection.py` peaks/padding/build/merge/budget; the single index→seconds conversion site; thread `peak_time` through merge. **DONE 2026-05-06** — 7 functions + §0.5 harness PASS in 2.27 s on JT (40 peaks → 4 final clips, total=37.805s = 100% of 37.805s budget); `output/cache/justin_timberlake_final_clips.json` written; SC1–SC5 all PASS; Pitfalls 18/19/20 neutralized.
 - [ ] **Phase 4: Export** — `export.py` ffmpeg cut (`-c copy`) and concat (demuxer with concat-filter re-encode fallback); own all subprocess calls.
 - [ ] **Phase 5: Orchestration & First-Video End-to-End** — `pipeline.py` glue + JSON §8 schema + determinism env vars; tune `--height`/`--min-gap-sec`/`--merge-gap-sec` on the most representative video and freeze; produce one watchable reel.
 - [ ] **Phase 6: Multi-Video Run & Submission Polish** — run remaining 4 videos with frozen parameters; `run_all.sh`; README with design rationale, known limitations (spec §11), per-video qualitative observations.
@@ -74,7 +74,8 @@ These hold across all phases and are referenced explicitly where they lock:
   3. `compute_budget_seconds(dur)` returns `(dur/1800)*60` and `compute_padding(budget)` returns `max(3.0, min(8.0, budget*0.15))`; `build_clips` uses `peak_time = timestamps[idx + 1]` (the alignment helper, not `timestamps[idx]`) and clamps to `[0, video_duration_sec]` (SELB-01..03).
   4. `merge_clips(clips, gap_threshold_sec=3.0)` carries `peak_time` as a 4th tuple element through the merge so the merged clip retains the higher-scoring peak's timestamp (Pitfall 19); a hard assertion `start_sec ≤ peak_timestamp_sec ≤ end_sec` passes for every merged clip (SELB-04).
   5. `enforce_budget(merged, budget_sec)` greedily selects by score descending, uses partial-clip logic that **centers on `peak_time`** when the remainder ≥3s (Pitfall 18), and the final list is re-sorted chronologically; the §0.5 print shows final clips (start, end, duration, score), `total ≤ budget` is asserted, and no two clips overlap (SELB-05..06).
-**Plans:** TBD
+**Plans:** 1 plan
+- [x] 03-01-PLAN.md — clip_selection.py: select_peaks (Pitfall 20 distance=samples) + apply_pelt_boost + compute_budget_seconds + compute_padding + build_clips (uses imported score_index_to_timestamp; D-45 single conversion seam) + merge_clips (4-tuple peak_time threading; Pitfall 19) + enforce_budget (partial centered on peak_time; Pitfall 18) + §0.5 verification harness with synthetic embedded test and JT final_clips.json fixture writer. Covers SELP-01..04, SELB-01..06. SUMMARY: 03-01-SUMMARY.md
 
 ### Phase 4: Export
 **Goal:** Cut individual clips losslessly with `ffmpeg -c copy` and concatenate them into a single highlight reel, with the concat demuxer's known fragility neutralized by validation and a re-encode fallback. All `subprocess` calls live here; the rest of the pipeline stays pure-Python.
@@ -118,7 +119,7 @@ These hold across all phases and are referenced explicitly where they lock:
 |-------|----------------|--------|-----------|
 | 1. Frame Extraction & Embeddings | 0/2 | Planned | - |
 | 2. Signal Processing | 0/1 | Planned | - |
-| 3. Clip Selection | 0/0 | Not started | - |
+| 3. Clip Selection | 1/1 | Complete | 2026-05-06 |
 | 4. Export | 0/0 | Not started | - |
 | 5. Orchestration & First-Video End-to-End | 0/0 | Not started | - |
 | 6. Multi-Video Run & Submission Polish | 0/0 | Not started | - |

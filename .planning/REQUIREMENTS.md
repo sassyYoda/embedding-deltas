@@ -81,19 +81,19 @@
 
 ### Clip Selection — Peak Detection
 
-- [ ] **SELP-01**: `select_peaks(scores, timestamps, height, min_gap_sec, fps=2.0)` uses `scipy.signal.find_peaks` with the height threshold and a `distance` parameter expressed in samples (`min_gap_sec * fps`)
-- [ ] **SELP-02**: Peaks are sorted by descending score
-- [ ] **SELP-03**: When PELT is active, peaks within ±5 samples of any changepoint receive a 1.2× score boost; results are re-sorted descending by boosted score
-- [ ] **SELP-04**: §0.5 verification: number of peaks detected, timestamps, and scores are printed before budget enforcement
+- [x] **SELP-01**: `select_peaks(scores, timestamps, height, min_gap_sec, fps=2.0)` uses `scipy.signal.find_peaks` with the height threshold and a `distance` parameter expressed in samples (`min_gap_sec * fps`)
+- [x] **SELP-02**: Peaks are sorted by descending score
+- [x] **SELP-03**: When PELT is active, peaks within ±5 samples of any changepoint receive a 1.2× score boost; results are re-sorted descending by boosted score
+- [x] **SELP-04**: §0.5 verification: number of peaks detected, timestamps, and scores are printed before budget enforcement
 
 ### Clip Selection — Construction, Merge, Budget
 
-- [ ] **SELB-01**: `compute_budget_seconds(video_duration_sec)` returns `(duration / 1800) * 60` (1 minute of reel per 30 minutes of video)
-- [ ] **SELB-02**: `compute_padding(budget_sec)` returns `max(3.0, min(8.0, budget_sec * 0.15))`
-- [ ] **SELB-03**: `build_clips(...)` builds candidate clips chronologically with `start = max(0, peak_time - padding)` and `end = min(video_duration, peak_time + padding)`
-- [ ] **SELB-04**: `merge_clips(clips, gap_threshold_sec)` merges adjacent clips within `--merge-gap-sec` (default 3.0); merged clip retains the maximum score
-- [ ] **SELB-05**: `enforce_budget(merged_clips, budget_sec)` greedily selects clips by score descending until the budget is hit; if a partial clip has ≥3.0 s remainder, it is appended; final list is re-sorted chronologically
-- [ ] **SELB-06**: §0.5 verification: final selected clips printed (start, end, duration, score); total duration asserted ≤ budget; no two clips overlap after merging
+- [x] **SELB-01**: `compute_budget_seconds(video_duration_sec)` returns `(duration / 1800) * 60` (1 minute of reel per 30 minutes of video)
+- [x] **SELB-02**: `compute_padding(budget_sec)` returns `max(3.0, min(8.0, budget_sec * 0.15))`
+- [x] **SELB-03**: `build_clips(...)` builds candidate clips chronologically with `start = max(0, peak_time - padding)` and `end = min(video_duration, peak_time + padding)`
+- [x] **SELB-04**: `merge_clips(clips, gap_threshold_sec)` merges adjacent clips within `--merge-gap-sec` (default 3.0); merged clip retains the maximum score
+- [x] **SELB-05**: `enforce_budget(merged_clips, budget_sec)` greedily selects clips by score descending until the budget is hit; if a partial clip has ≥3.0 s remainder, it is appended; final list is re-sorted chronologically
+- [x] **SELB-06**: §0.5 verification: final selected clips printed (start, end, duration, score); total duration asserted ≤ budget; no two clips overlap after merging
 
 ### Export — Cut & Concat
 
@@ -194,16 +194,16 @@ Confirmed by roadmap creation (2026-05-06). Every v1 requirement is mapped to ex
 | SIGP-01 | Phase 2 | Complete |
 | SIGP-02 | Phase 2 | Complete |
 | SIGP-03 | Phase 2 | Complete |
-| SELP-01 | Phase 3 | Pending |
-| SELP-02 | Phase 3 | Pending |
-| SELP-03 | Phase 3 | Pending |
-| SELP-04 | Phase 3 | Pending |
-| SELB-01 | Phase 3 | Pending |
-| SELB-02 | Phase 3 | Pending |
-| SELB-03 | Phase 3 | Pending |
-| SELB-04 | Phase 3 | Pending |
-| SELB-05 | Phase 3 | Pending |
-| SELB-06 | Phase 3 | Pending |
+| SELP-01 | Phase 3 | Complete |
+| SELP-02 | Phase 3 | Complete |
+| SELP-03 | Phase 3 | Complete |
+| SELP-04 | Phase 3 | Complete |
+| SELB-01 | Phase 3 | Complete |
+| SELB-02 | Phase 3 | Complete |
+| SELB-03 | Phase 3 | Complete |
+| SELB-04 | Phase 3 | Complete |
+| SELB-05 | Phase 3 | Complete |
+| SELB-06 | Phase 3 | Complete |
 | EXPC-01 | Phase 4 | Pending |
 | EXPC-02 | Phase 4 | Pending |
 | EXPC-03 | Phase 4 | Pending |
