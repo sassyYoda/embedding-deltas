@@ -45,27 +45,39 @@
 
 ### Signal Processing — Deltas
 
-- [ ] **SIGD-01**: `signal_processing.compute_deltas(embeddings)` returns an `(N-1,)` array of cosine distances `1 - dot_product`, with `np.clip(dots, -1, 1)` for numerical safety
-- [ ] **SIGD-02**: Timestamp alignment invariant is implemented and documented: `delta[i]` (and `score[i]`) corresponds to `timestamps[i+1]` — encoded as a single helper used by `clip_selection`
-- [ ] **SIGD-03**: §0.5 verification: first 20 raw delta values printed and visually within 0.0–0.3 typical range; length asserted to be `N-1`
+- [x] **SIGD-01
+**: `signal_processing.compute_deltas(embeddings)` returns an `(N-1,)` array of cosine distances `1 - dot_product`, with `np.clip(dots, -1, 1)` for numerical safety
+- [x] **SIGD-02
+**: Timestamp alignment invariant is implemented and documented: `delta[i]` (and `score[i]`) corresponds to `timestamps[i+1]` — encoded as a single helper used by `clip_selection`
+- [x] **SIGD-03
+**: §0.5 verification: first 20 raw delta values printed and visually within 0.0–0.3 typical range; length asserted to be `N-1`
 
 ### Signal Processing — Smoothing
 
-- [ ] **SIGS-01**: A median filter is applied to raw deltas with kernel size 5 (per spec §5 step 1)
-- [ ] **SIGS-02**: §0.5 verification: raw vs smoothed deltas compared — no isolated single-sample spikes in smoothed signal; sustained high-delta periods preserved
+- [x] **SIGS-01
+**: A median filter is applied to raw deltas with kernel size 5 (per spec §5 step 1)
+- [x] **SIGS-02
+**: §0.5 verification: raw vs smoothed deltas compared — no isolated single-sample spikes in smoothed signal; sustained high-delta periods preserved
 
 ### Signal Processing — MAD Normalization
 
-- [ ] **SIGM-01**: `mad_normalize(smoothed, window_samples=180)` implements rolling MAD normalization over a centered 180-sample (= 90 s at 2 fps) window
-- [ ] **SIGM-02**: Zero-MAD windows (static footage) are guarded against; `0.0` is emitted in that case
-- [ ] **SIGM-03**: Output is post-clipped to `[0.0, 10.0]` per spec §5
-- [ ] **SIGM-04**: §0.5 verification: min/max/mean of normalized scores printed; max ≥ 2.0 sanity-checked (window not too large), <90% of samples above 3.0 (window not too small)
+- [x] **SIGM-01
+**: `mad_normalize(smoothed, window_samples=180)` implements rolling MAD normalization over a centered 180-sample (= 90 s at 2 fps) window
+- [x] **SIGM-02
+**: Zero-MAD windows (static footage) are guarded against; `0.0` is emitted in that case
+- [x] **SIGM-03
+**: Output is post-clipped to `[0.0, 10.0]` per spec §5
+- [x] **SIGM-04
+**: §0.5 verification: min/max/mean of normalized scores printed; max ≥ 2.0 sanity-checked (window not too large), <90% of samples above 3.0 (window not too small)
 
 ### Signal Processing — PELT (opt-in)
 
-- [ ] **SIGP-01**: Pipeline accepts a `--pelt` boolean flag (default `False`) per spec §5
-- [ ] **SIGP-02**: When `--pelt` is passed, `detect_changepoints(smoothed, penalty=3.0)` runs via `ruptures.Pelt(model="rbf")`; `ruptures` is lazy-imported so non-PELT runs do not require it (pitfall + research recommendation)
-- [ ] **SIGP-03**: When `--pelt` is not passed, `detect_changepoints` is never called and PELT-related JSON fields are emitted as `null` (not `False`, not omitted)
+- [x] **SIGP-01
+**: Pipeline accepts a `--pelt` boolean flag (default `False`) per spec §5
+- [x] **SIGP-02
+**: When `--pelt` is passed, `detect_changepoints(smoothed, penalty=3.0)` runs via `ruptures.Pelt(model="rbf")`; `ruptures` is lazy-imported so non-PELT runs do not require it (pitfall + research recommendation)
+- [x] **SIGP-03
+**: When `--pelt` is not passed, `detect_changepoints` is never called and PELT-related JSON fields are emitted as `null` (not `False`, not omitted)
 
 ### Clip Selection — Peak Detection
 
@@ -170,18 +182,18 @@ Confirmed by roadmap creation (2026-05-06). Every v1 requirement is mapped to ex
 | EMBD-04 | Phase 1 | Pending |
 | EMBD-05 | Phase 1 | Pending |
 | EMBD-06 | Phase 1 | Pending |
-| SIGD-01 | Phase 2 | Pending |
-| SIGD-02 | Phase 2 | Pending |
-| SIGD-03 | Phase 2 | Pending |
-| SIGS-01 | Phase 2 | Pending |
-| SIGS-02 | Phase 2 | Pending |
-| SIGM-01 | Phase 2 | Pending |
-| SIGM-02 | Phase 2 | Pending |
-| SIGM-03 | Phase 2 | Pending |
-| SIGM-04 | Phase 2 | Pending |
-| SIGP-01 | Phase 2 | Pending |
-| SIGP-02 | Phase 2 | Pending |
-| SIGP-03 | Phase 2 | Pending |
+| SIGD-01 | Phase 2 | Complete |
+| SIGD-02 | Phase 2 | Complete |
+| SIGD-03 | Phase 2 | Complete |
+| SIGS-01 | Phase 2 | Complete |
+| SIGS-02 | Phase 2 | Complete |
+| SIGM-01 | Phase 2 | Complete |
+| SIGM-02 | Phase 2 | Complete |
+| SIGM-03 | Phase 2 | Complete |
+| SIGM-04 | Phase 2 | Complete |
+| SIGP-01 | Phase 2 | Complete |
+| SIGP-02 | Phase 2 | Complete |
+| SIGP-03 | Phase 2 | Complete |
 | SELP-01 | Phase 3 | Pending |
 | SELP-02 | Phase 3 | Pending |
 | SELP-03 | Phase 3 | Pending |

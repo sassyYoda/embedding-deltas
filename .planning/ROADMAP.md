@@ -28,7 +28,7 @@ These hold across all phases and are referenced explicitly where they lock:
 ## Phases
 
 - [x] **Phase 1: Frame Extraction & Embeddings** — `extract.py` + utils video-metadata helpers; produce the canonical `(timestamps, embeddings)` fixture from one sample video, with all 8 frame/embedding pitfalls neutralized. **DONE 2026-05-06** — verified on `videos/justin_timberlake.mp4` (615s on MPS); fixture at `output/cache/justin_timberlake_{embeddings,timestamps}.npy`.
-- [ ] **Phase 2: Signal Processing** — `signal_processing.py` deltas/median/MAD on Phase-1 fixture; lock the timestamp-alignment invariant with a synthetic test; lazy-import PELT as opt-in.
+- [x] **Phase 2: Signal Processing** — `signal_processing.py` deltas/median/MAD on Phase-1 fixture; lock the timestamp-alignment invariant with a synthetic test; lazy-import PELT as opt-in. **DONE 2026-05-06** — 5 functions + §0.5 harness PASS in 0.49 s on JT (2,269-frame fixture); `output/cache/justin_timberlake_scores.npy` (2268,) float64 written; SC1–SC5 all PASS.
 - [ ] **Phase 3: Clip Selection** — `clip_selection.py` peaks/padding/build/merge/budget; the single index→seconds conversion site; thread `peak_time` through merge.
 - [ ] **Phase 4: Export** — `export.py` ffmpeg cut (`-c copy`) and concat (demuxer with concat-filter re-encode fallback); own all subprocess calls.
 - [ ] **Phase 5: Orchestration & First-Video End-to-End** — `pipeline.py` glue + JSON §8 schema + determinism env vars; tune `--height`/`--min-gap-sec`/`--merge-gap-sec` on the most representative video and freeze; produce one watchable reel.
@@ -61,8 +61,8 @@ These hold across all phases and are referenced explicitly where they lock:
   3. Comparing raw vs `smooth_deltas(raw, kernel_size=5)` shows no isolated single-sample spikes survive while sustained high-delta periods remain visible; edge handling does not produce a phantom dip in the first/last 2 samples (Pitfall 9 — use `scipy.ndimage.median_filter(mode='reflect')` or pad-then-`medfilt`) (SIGS-01..02).
   4. Running `mad_normalize(smoothed, window_samples=180)` prints min/max/mean of normalized scores; max ≥ 2.0 (window not too large) and <90% of samples are above 3.0 (window not too small); the zero-MAD branch is gated at `mad > 1e-3` (not `1e-8` — Pitfall 10) and the percentage of zero-MAD samples is printed and is <5% on a typical sample video (SIGM-01..04).
   5. With `--pelt` off, `ruptures` is never imported (verified by inspecting `sys.modules` after a non-PELT run); with `--pelt` on, `detect_changepoints(smoothed, penalty=3.0)` returns a list of indices via `ruptures.Pelt(model="rbf")` and the import happens lazily inside the function (SIGP-01..03).
-**Plans:** 1 plan
-- [ ] 02-01-PLAN.md — signal_processing.py: compute_deltas + smooth_deltas (ndimage.median_filter mode=reflect) + mad_normalize (1e-3 MAD floor) + detect_changepoints (lazy ruptures) + score_index_to_timestamp helper, plus §0.5 verification harness with synthetic two-color alignment test and JT scores fixture writer. Covers SIGD-01..03, SIGS-01..02, SIGM-01..04, SIGP-01..03.
+**Plans:** 1 plan (complete)
+- [x] 02-01-PLAN.md — signal_processing.py: compute_deltas + smooth_deltas (ndimage.median_filter mode=reflect) + mad_normalize (1e-3 MAD floor) + detect_changepoints (lazy ruptures) + score_index_to_timestamp helper, plus §0.5 verification harness with synthetic two-color alignment test and JT scores fixture writer. Covers SIGD-01..03, SIGS-01..02, SIGM-01..04, SIGP-01..03. SUMMARY: 02-01-SUMMARY.md
 
 ### Phase 3: Clip Selection
 **Goal:** Convert `(scores, timestamps)` into a final ordered list of `(start_sec, end_sec, score, peak_time)` clips that fits the duration budget, with index→seconds conversion isolated to this module and `peak_time` carried through merging so JSON consumers can rely on `start ≤ peak_timestamp_sec ≤ end`.

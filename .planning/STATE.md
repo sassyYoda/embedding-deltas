@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 1 complete (extract.py + utils.py + §0.5 verification fixture); ready for `/gsd-plan-phase 2`
-last_updated: "2026-05-06T20:02:30.161Z"
+status: completed
+last_updated: "2026-05-06T20:46:56.292Z"
 progress:
   total_phases: 6
-  completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
+  completed_phases: 2
+  total_plans: 3
+  completed_plans: 3
   percent: 100
 ---
 
@@ -18,7 +18,7 @@ progress:
 
 **Core Value:** Given a body cam video, produce a highlight reel where selected moments visibly correspond to high-action or significant scene changes — using only visual embedding signal — reproducibly across all five sample videos with one fixed parameter set.
 
-**Current Focus:** Phase 1 — Frame Extraction & Embeddings. Highest pitfall density (8 of 20 cataloged); must lock the canonical `(timestamps, embeddings)` fixture before any downstream work begins.
+**Current Focus:** Phase 2 — Signal Processing. COMPLETE 2026-05-06 (Plan 02-01); `signal_processing.py` ships compute_deltas/smooth_deltas/mad_normalize/detect_changepoints/score_index_to_timestamp + §0.5 harness. Phase 3 dev fixture `output/cache/justin_timberlake_scores.npy` (2268,) float64 on disk.
 
 **Locked spec:** `assignment-details/bodycam_highlight_reel_spec.md` is the single source of truth. Every implementation decision traces to a numbered section there.
 
@@ -27,10 +27,10 @@ progress:
 ## Current Position
 
 - **Milestone:** v1 (initial submission)
-- **Phase:** 1 — Frame Extraction & Embeddings (COMPLETE)
-- **Next phase:** 2 — Signal Processing
-- **Status:** Phase 1 complete; canonical (timestamps, embeddings) fixture written to output/cache/. Ready for `/gsd-plan-phase 2`.
-- **Progress:** 1/6 phases complete `[█▓░░░░░░░░] ~17%`
+- **Phase:** 2 — Signal Processing (COMPLETE)
+- **Next phase:** 3 — Clip Selection
+- **Status:** Phase 2 complete; signal_processing.py ships 5 functions + §0.5 harness; `output/cache/justin_timberlake_scores.npy` (2268,) float64 on disk for Phase 3 dev. Ready for `/gsd-plan-phase 3`.
+- **Progress:** 2/6 phases complete `[███▓░░░░░░] ~33%`
 
 ---
 
@@ -38,13 +38,14 @@ progress:
 
 | Metric | Value |
 |--------|-------|
-| Phases planned | 1 / 6 |
-| Phases complete | 1 / 6 |
+| Phases planned | 2 / 6 |
+| Phases complete | 2 / 6 |
 | Requirements mapped | 51 / 51 ✓ |
-| Requirements complete | 17 / 51 (ENV-01..04, EXTR-01..05, EMBD-01..06) |
-| Plans executed | 2 (01-01 + 01-02) |
+| Requirements complete | 29 / 51 (ENV-01..04, EXTR-01..05, EMBD-01..06, SIGD-01..03, SIGS-01..02, SIGM-01..04, SIGP-01..03) |
+| Plans executed | 3 (01-01 + 01-02 + 02-01) |
 | Sample videos processed end-to-end | 0 / 5 |
 | Phase 01 §0.5 harness wall-clock (mps, JT 19-min video) | 615.25 s real / 542.68 s user |
+| Phase 02 §0.5 harness wall-clock (numpy/scipy, JT 2,269-frame fixture) | 0.49 s real |
 
 ### Plan Execution
 
@@ -52,6 +53,7 @@ progress:
 |------|----------------|-------|-------|
 | Phase 01 P01 | ~5 | 2 | 7 |
 | Phase 01 P02 | ~12 | 2 | 1 |
+| Phase 02 P01 | ~25 | 2 | 1 (signal_processing.py replaces stub; 2 fixture .npy written under output/cache/) |
 
 ## Accumulated Context
 
@@ -87,6 +89,9 @@ progress:
 
 - **Plan 01-02:** Honored D-09 verbatim ('ViT-L-14' + pretrained='openai'); flagged QuickGELU mismatch UserWarning as a CONTEXT amendment for the user before fixtures propagate to Phase 2.
 - **Plan 01-02:** MPS bit-identical rerun (D-17) PASSED on first call without explicit warm-up — RESEARCH A5's documented warm-up batch fallback is NOT needed for Phase 1.
+- **Plan 02-01:** D-22 dtype contract enforced via explicit `np.sum(..., dtype=np.float64)` — numpy 2.x no longer auto-upcasts float32-axis-reductions to float64.
+- **Plan 02-01:** Pitfall 10 §0.5 diagnostic refined to count zero-MAD-branch firings (NOT total zero scores), since the [0,10] clip floors negatives to 0 — different concern.
+- **Plan 02-01:** Synthetic two-color alignment test (D-25) asserts on RAW-deltas argmax (k=5 median attenuates a single-sample spike — intentional per plan-checker; the helper's correctness is what's verified).
 
 ### Blockers
 
@@ -98,23 +103,24 @@ None — Phase 1 §0.5 verification PASSED end-to-end on `videos/justin_timberla
 
 **Last session (2026-05-06):**
 
-- Executed Plan 01-02 (extract.py + §0.5 harness) end-to-end. Two atomic commits: `d99fd32` (Task 1: sample_frames + load_model + embed_frames) and `40a1e28` (Task 2: __main__ harness with ffmpeg precondition + bit-identical rerun + fixture writer).
-- Ran §0.5 verification on `videos/justin_timberlake.mp4` (1134.144s, h264, 1280x720, CFR): 2269 frames sampled, embeddings (2269, 768) float32 L2-normalized, drift 0.144s, [determinism] PASS on MPS without warm-up. Wall-clock 615s.
-- Wrote fixtures `output/cache/justin_timberlake_{embeddings,timestamps}.npy` for Phase 2 parallel development.
-- Marked complete: ENV-02, EXTR-01..05, EMBD-01..06 (12 reqs).
-- Flagged QuickGELU mismatch UserWarning from open_clip 3.3.0 as CONTEXT-amendment territory before Phase 2.
+- Executed Plan 02-01 (signal_processing.py + §0.5 harness) end-to-end. Two atomic commits: `5d3f3f4` (Task 1: 5 core functions, replaces stub) and `baf798b` (Task 2: 9-step __main__ harness + JT scores fixture writer).
+- Ran §0.5 harness on `output/cache/justin_timberlake_{embeddings,timestamps}.npy` (2,269 frames): deltas (2268,) float64 in [0.0056, 0.4806], smoothed spike-injection PASS, edge-preservation PASS, MAD scores in [0.0, 10.0] mean 0.7577, zero-MAD-branch 0.00%, alignment test PASS (peak idx 6 → ts 3.5s within ε=1e-9), lazy-import contract PASS, --pelt round-trip 86 changepoints. Wall-clock 0.49s.
+- Wrote fixture `output/cache/justin_timberlake_scores.npy` (2268,) float64 for Phase 3 parallel development; optional `output/cache/justin_timberlake_changepoints.npy` written when --pelt.
+- Marked complete: SIGD-01..03, SIGS-01..02, SIGM-01..04, SIGP-01..03 (12 reqs).
+- All ROADMAP §2 SC1–SC5 PASS with concrete numbers reproduced in 02-01-SUMMARY.md.
 
-**Next action:** `/gsd-plan-phase 2` to decompose Phase 2 (Signal Processing) — `signal_processing.py` deltas/medfilt/MAD/PELT against the Phase 1 fixture. **Before planning, resolve the QuickGELU open issue** so Phase 2 doesn't lock in stale embeddings.
+**Next action:** `/gsd-plan-phase 3` to decompose Phase 3 (Clip Selection) — `clip_selection.py` find_peaks → adaptive padding → merge → budget enforcement. Phase 3 imports `score_index_to_timestamp` from `signal_processing` (single index→seconds site — DO NOT inline `timestamps[idx+1]` per Pitfall 8). Develops against the JT scores fixture for fast iteration without re-running CLIP.
 
 **Recent files touched:**
 
-- `extract.py` (created Task 1; appended Task 2)
-- `output/cache/justin_timberlake_embeddings.npy` (new)
-- `output/cache/justin_timberlake_timestamps.npy` (new)
-- `.planning/phases/01-frame-extraction-embeddings/01-02-SUMMARY.md` (new)
+- `signal_processing.py` (replaced stub with 5 functions + 9-step __main__ harness)
+- `output/cache/justin_timberlake_scores.npy` (new, gitignored)
+- `output/cache/justin_timberlake_changepoints.npy` (new when --pelt, gitignored)
+- `.planning/phases/02-signal-processing/02-01-SUMMARY.md` (new)
 - `.planning/STATE.md` (this update)
 - `.planning/REQUIREMENTS.md` (12 checkboxes ticked)
+- `.planning/ROADMAP.md` (Phase 2 mark complete)
 
 ---
 
-*Last updated: 2026-05-06 after Plan 01-02 execution*
+*Last updated: 2026-05-06 after Plan 02-01 execution*
