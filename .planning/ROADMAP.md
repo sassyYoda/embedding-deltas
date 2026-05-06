@@ -61,7 +61,8 @@ These hold across all phases and are referenced explicitly where they lock:
   3. Comparing raw vs `smooth_deltas(raw, kernel_size=5)` shows no isolated single-sample spikes survive while sustained high-delta periods remain visible; edge handling does not produce a phantom dip in the first/last 2 samples (Pitfall 9 — use `scipy.ndimage.median_filter(mode='reflect')` or pad-then-`medfilt`) (SIGS-01..02).
   4. Running `mad_normalize(smoothed, window_samples=180)` prints min/max/mean of normalized scores; max ≥ 2.0 (window not too large) and <90% of samples are above 3.0 (window not too small); the zero-MAD branch is gated at `mad > 1e-3` (not `1e-8` — Pitfall 10) and the percentage of zero-MAD samples is printed and is <5% on a typical sample video (SIGM-01..04).
   5. With `--pelt` off, `ruptures` is never imported (verified by inspecting `sys.modules` after a non-PELT run); with `--pelt` on, `detect_changepoints(smoothed, penalty=3.0)` returns a list of indices via `ruptures.Pelt(model="rbf")` and the import happens lazily inside the function (SIGP-01..03).
-**Plans:** TBD
+**Plans:** 1 plan
+- [ ] 02-01-PLAN.md — signal_processing.py: compute_deltas + smooth_deltas (ndimage.median_filter mode=reflect) + mad_normalize (1e-3 MAD floor) + detect_changepoints (lazy ruptures) + score_index_to_timestamp helper, plus §0.5 verification harness with synthetic two-color alignment test and JT scores fixture writer. Covers SIGD-01..03, SIGS-01..02, SIGM-01..04, SIGP-01..03.
 
 ### Phase 3: Clip Selection
 **Goal:** Convert `(scores, timestamps)` into a final ordered list of `(start_sec, end_sec, score, peak_time)` clips that fits the duration budget, with index→seconds conversion isolated to this module and `peak_time` carried through merging so JSON consumers can rely on `start ≤ peak_timestamp_sec ≤ end`.
@@ -116,7 +117,7 @@ These hold across all phases and are referenced explicitly where they lock:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Frame Extraction & Embeddings | 0/2 | Planned | - |
-| 2. Signal Processing | 0/0 | Not started | - |
+| 2. Signal Processing | 0/1 | Planned | - |
 | 3. Clip Selection | 0/0 | Not started | - |
 | 4. Export | 0/0 | Not started | - |
 | 5. Orchestration & First-Video End-to-End | 0/0 | Not started | - |
