@@ -125,9 +125,24 @@ The `output/` directory is gitignored.
 - MAD peaks within ±5 samples of a PELT changepoint receive a 1.2× score boost before budget enforcement
 - The JSON's `coincides_with_pelt_changepoint` field flips from `null` → `true`/`false` per clip (strict three-state — never omitted)
 
-**Whether `--pelt` actually changes selection depends on the signal characteristics.** In our tuning A/B on tiger_woods (spec-default budget), `--pelt` did NOT alter the final clip selection — all three top peaks already pegged the MAD ceiling (score=10.0), so the 1.2× boost couldn't reorder them. The PELT field DID flip to `true` for all three selected peaks, confirming they coincide with structural changepoints (informational metadata only). On signals with more variance in the top-peaks, `--pelt` may reorder selection.
+**Full A/B run (no-pelt vs --pelt) across all 4 videos × 2 budgets = 8 comparisons** (comparison JSONs at `output/timestamps_pelt/` and `output/timestamps_60s_pelt/`):
 
-**The reels included in this repo were produced WITHOUT `--pelt`** — the `coincides_with_pelt_changepoint` field is `null` in every JSON. Re-running with `--pelt` enabled is a one-line change. Both are valid per spec §5 (PELT is opt-in supplementary).
+```
+                       Selection differs?    PELT-coincidence pattern
+  JT  (default + 60s):  no  /  no            None of selected peaks coincide (0/4, 0/2)
+  tiger_woods    "":    no  /  no            ALL coincide (3/3, 3/3)
+  test_assault   "":    no  /  no            None coincide (0/1, 0/2)
+  test_missing   "":    no  /  no            ALL coincide (1/1, 3/3)
+```
+
+**`--pelt` did NOT alter selection in any of the 8 runs.** This is partly because the top peaks for several videos already peg the MAD ceiling (10.0) — the 1.2× boost can't reorder ceiling-tied peaks. But the comparison surfaces a more interesting cross-validation finding:
+
+- **`tiger_woods` and `test_missing_person`:** every selected peak coincides with a PELT changepoint. The MAD signal and PELT changepoint signal AGREE on what's significant in these videos.
+- **`justin_timberlake` and `test_assault_theft`:** zero selected peaks coincide with PELT changepoints. The MAD peaks fire on sharp local outliers WITHOUT regime shifts in the underlying smoothed signal — these videos have many small visual transitions rather than a few big structural shifts.
+
+This is exactly the cross-check `--pelt` was designed to provide per spec §5: confirmation when the two signals agree (Tiger, missing-person), or a flag when they don't (JT, assault-theft). For agreement videos, both signals are pointing at the same moments — high confidence. For disagreement videos, the MAD-only selection is still defensible (the chosen clips ARE genuinely high-anomaly per the rolling-MAD criterion) but the absence of co-located changepoints suggests the moments are more "spike" than "regime shift" in nature.
+
+**The reels in this repo were produced WITHOUT `--pelt`** (the `coincides_with_pelt_changepoint` field is `null` in `output/timestamps/*.json`). Re-running with `--pelt` is a one-line change and produces identical clips with the metadata field populated. Both are valid per spec §5.
 
 ## Frozen Tuning Parameters
 
