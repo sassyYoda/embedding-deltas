@@ -223,7 +223,3 @@ transcripts/                     # gitignored — dev-time eval only, never in s
 - Spec §2's CLIP ViT-L/14 OpenAI choice grounded in [Koddenbrock et al. 2025](https://arxiv.org/abs/2501.05691) — robustness of CLIP variants under handheld-camera distortions.
 - Spec §5's median+MAD approach grounded in classical impulse-noise filtering literature (Huang et al. 1979; Tukey 1977) and improves on a fixed-threshold k-most-distinct baseline that proved brittle on body-cam footage with variable activity levels.
 - The reel narrative coherence verified above is genuine — no audio or transcript signal was used by the algorithm; the transcripts were generated independently for eval only.
-
----
-
-*Built with the [GSD (Get Shit Done)](https://github.com/x-commando/gsd) planning workflow. Internal planning artifacts in `.planning/` (gitignored).*
