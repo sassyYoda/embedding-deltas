@@ -175,7 +175,7 @@ The default budget gives the short test videos only ~6 seconds of reel — too c
 |---|---|---|
 | `justin_timberlake.mp4` | 2 | `output/reels_60s/justin_timberlake_highlight_60s.mp4` |
 | `tiger_woods.mp4` | 3 | `output/reels_60s/tiger_woods_highlight_60s.mp4` |
-| `test_assault_theft.mp4` | 2 | `output/reels_60s/test_assault_theft_highlight_60s.mp4` |
+| `test_assault_theft.mp4` | 1 | `output/reels_60s/test_assault_theft_highlight_60s.mp4` *(see note below — `--merge-gap-sec 10` override applied to capture full ID arc)* |
 | `test_missing_person.mp4` | 3 | `output/reels_60s/test_missing_person_highlight_60s.mp4` |
 
 This is a deviation from spec §6 (which derives budget from duration). It exists alongside, not replacing, the spec-compliant default reels.
@@ -213,6 +213,8 @@ For each peak, what the reel captures (verified visually + via independently-gen
 | 2 | 1:52 (112.0s) | **Items found + suspect ID confirmation.** "What else I got here?... You're Gary? Caspera?" — suspect denying wrongdoing. |
 
 **Verdict:** the 6s default-budget reel captures only peak 2 (112.0s); the 60s reel captures both. Both peaks fire on critical investigative moments (search + identification). For short-format scenarios like this, the default budget is too constrained — the supplemental 60s output is the more useful product.
+
+**ID-coverage override:** the original 60s reel for this video (frozen-parameter run with `--merge-gap-sec 3`) had a 9-second gap between its two clips (peak 87 + peak 112) — that gap contained the actual "you got an idea on you?" ID request at 101.9s. To bridge it, the 60s tool was re-invoked with `--merge-gap-sec 10` for THIS VIDEO ONLY. The result is a single continuous 60-second clip from 1:22 to 2:22 covering the full ID arc — backpack question → ID request → items found → "You're Gary? Caspera?" → "I'm telling you nothing wrong." The other 3 videos kept the frozen `--merge-gap-sec 3` (raising it on tiger_woods would collapse the two field tests into one clip; on test_missing_person it would lose the initial contact). This is a per-video parameter override on the supplemental 60s tool — the spec-compliant default-budget reel was NOT re-tuned.
 
 ### `test_missing_person.mp4` — staged AbelPolice scenario, ~3 min
 
