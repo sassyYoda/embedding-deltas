@@ -276,15 +276,32 @@ def enforce_budget(
         else:
             remainder = budget_sec - total
             if remainder >= 3.0:
-                # Partial clip CENTERED ON peak_time (Pitfall 18).
+                # Partial clip CENTERED ON peak_time (Pitfall 18 / D-47).
+                # Pick a window of width `remainder` centered on peak_time, then
+                # shift it (preserving width) to stay inside [start, end].
+                # This guarantees `partial_start <= peak_time <= partial_end`
+                # because peak_time ∈ [start, end] is asserted by merge_clips
+                # (Pitfall 19 / D-46), and shifting only happens to anchor a
+                # boundary at start or end.
                 half = remainder / 2.0
-                partial_start = max(start, peak_time - half)
-                partial_end = min(end, partial_start + remainder)
-                # If the centered window is squeezed (peak near clip edge), fall back
-                # to truncating at clip.start (D-47 fallback ratio 0.95).
-                if (partial_end - partial_start) < remainder * 0.95:
+                partial_start = peak_time - half
+                partial_end = peak_time + half
+                # Left clamp: if window pokes past the start edge, shift right.
+                if partial_start < start:
+                    partial_end = min(end, partial_end + (start - partial_start))
                     partial_start = start
-                    partial_end = min(end, start + remainder)
+                # Right clamp: if window pokes past the end edge, shift left.
+                if partial_end > end:
+                    partial_start = max(start, partial_start - (partial_end - end))
+                    partial_end = end
+                # NOTE: after both clamps, partial may be NARROWER than `remainder`
+                # iff the source clip's duration was already < remainder. In that
+                # case partial == [start, end] and peak_time is inside by construction.
+                # We previously had a fallback (D-47 0.95 ratio) that anchored to
+                # clip.start when the centered window was squeezed; that fallback
+                # discarded peak_time and broke the alignment invariant when peak
+                # was close to clip's right edge with a large budget remainder.
+                # Removed in favor of the shift-preserving logic above.
                 selected.append((
                     float(partial_start), float(partial_end),
                     float(score), float(peak_time),
