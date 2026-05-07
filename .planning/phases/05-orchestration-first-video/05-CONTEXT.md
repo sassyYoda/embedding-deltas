@@ -138,10 +138,10 @@ Phase 5 delivers (in `pipeline.py`):
 
 ### Frozen Tuning Parameters (DOC-03)
 
-- **D-75:** **Phase 5 tunes parameters on JT (Justin Timberlake) — the representative video.** Why JT:
-  - It's the only fully-processed video at this phase (Phase 1 emitted JT fixture first).
-  - Has good signal characteristics (Phase 2 reported 6.48% of scores above 3.0; Phase 3 reported 4 well-separated clips at default params).
-  - Is mid-length (19 min) — represents the median of the 5 sample videos better than the 3-min tests or 75-min Marcus Jordan.
+- **D-75 (AMENDED 2026-05-06):** **Phase 5 tunes parameters on `marcus_jordan` (75.2 min) — the LONGEST video.** Spec §6 says verbatim: "Tune these once on the **longest/most representative** video, then hold them fixed across all five videos." Marcus Jordan is the longest by 2.7×, has 9,025 frames at 2 fps (4× the next-largest video), and is the most signal-rich — exactly what spec §6's tuning advice favors ("enough peaks to fill the budget greedily without so many that selection becomes arbitrary").
+  - **Original D-75 chose JT in error** — the rationale "median is representative" contradicted the spec's explicit "longest/most representative" guidance. Corrected.
+  - **`pipeline.py videos/justin_timberlake.mp4` is run as a SMOKE TEST** (validates code end-to-end: env-var stanza, JSON schema, two-run reproducibility) but the JT run is NOT the source of frozen tuning parameters.
+  - **Tuning sequence:** (1) JT smoke test confirms pipeline.py works end-to-end. (2) Wait for marcus_jordan fixture (background streaming extract in progress). (3) Run `pipeline.py videos/marcus_jordan.mp4` and assess peak count, budget fill %, qualitative reel quality. (4) If parameters need adjustment from defaults `(--height=1.5, --min-gap-sec=15, --merge-gap-sec=3)`, sweep them on marcus_jordan. (5) Freeze the values that produced the best marcus_jordan reel.
 - **D-76:** Initial parameter sweep on JT — try `(height, min_gap_sec, merge_gap_sec)` combinations on the cached embeddings (instant iteration via Phase 2/3 fixtures):
   - Default: `(1.5, 15.0, 3.0)` — produces 4 clips, fills budget 100%.
   - Variations to try: `(1.0, 15.0, 3.0)` (more candidate peaks), `(2.0, 15.0, 3.0)` (fewer/stronger peaks), `(1.5, 10.0, 3.0)` (finer min-gap), `(1.5, 15.0, 5.0)` (coarser merge).
@@ -171,7 +171,7 @@ Phase 5 delivers (in `pipeline.py`):
 
 ### Multi-Video Awareness
 
-- **D-82:** Phase 5 operates on **one video** (JT). Phase 6's batch runs `pipeline.py` per video with the frozen parameters. The `run()` function is video-agnostic; only `__main__`'s default-resolution logic picks JT when no `video` arg is given (and only in dev-time helper mode — the spec §9 contract requires the positional arg).
+- **D-82 (AMENDED 2026-05-06):** Phase 5 operates on **one video for tuning (marcus_jordan, the longest)** and **one video as a smoke test (JT, the first-processed)**. Phase 6's batch runs `pipeline.py` per video with the frozen parameters. The `run()` function is video-agnostic; spec §9 contract requires the positional `video` argument so there's no default-resolution logic in pipeline.py.
 
 ### Claude's Discretion
 
