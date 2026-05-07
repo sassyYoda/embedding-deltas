@@ -15,3 +15,5 @@ output/
 # Editor
 .vscode/
 .idea/
+transcripts/
+frames_analysis/
