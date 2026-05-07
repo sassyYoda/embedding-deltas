@@ -174,6 +174,62 @@ The Drive folder contained 5 videos. Four are processed end-to-end. The fifth �
 
 **Not done:** marcus_jordan was not retried with CPU-only inference (which would be reliable but ~3-5× slower; estimated 3-4 hours wall-clock). On a machine with more reliable MPS or a CUDA GPU, the canonical `pipeline.py` should process all 5 videos cleanly.
 
+### What the Algorithm MISSED (failure-mode analysis)
+
+Cross-referencing each video's full transcript against the selected peaks surfaces the moments the algorithm should have caught but didn't, plus the visual reason why. This is the most useful eval signal in the project — it tells us where the visual-only approach hits its ceiling.
+
+**`justin_timberlake.mp4` — missed moments**
+
+| Time | What's actually happening | Why the algorithm missed it |
+|---|---|---|
+| 4:45 (~285s) | **JT verbally protests:** "Guys, I'm just following my friends back to my house. I'm not doing anything. Will you do these tests? Sure." This is the encounter's emotional pivot — JT denies impairment then submits to testing. | The visual scene is unchanged from the surrounding 30+ seconds. Officer stands facing JT. CLIP embeddings for consecutive frames during a stable conversation are almost identical → very low cosine deltas. **No visual signal corresponds to the verbal content.** |
+| 18:14 (~1094s) | **"Why are you arresting me?"** — JT directly questioning the arrest, plus the entire 50-second exchange about phone/property handover and friend trying to mediate. | The bodycam has been pointed at the patrol vehicle + officer + JT silhouette for ~13 minutes by this point. The scene composition (police car with flashing lights) is the local visual baseline; the rolling MAD window has adapted to it. **Local baseline elevation suppresses peaks within long stable scenes.** |
+
+**`tiger_woods.mp4` — missed moments**
+
+| Time | What's actually happening | Why the algorithm missed it |
+|---|---|---|
+| 4:17 (~257s) | **DUI investigation OFFICIALLY STARTS:** "I respond here to conduct a DUI investigation on you... can you tell me what happened with the crash?" | This was a verbal pivot from civil (crash investigation) to criminal (DUI). The bodycam was pointed at Tiger sitting in his car for the preceding minute and continued pointing at him. **No visual cue distinguishes the procedural pivot from the surrounding interview.** |
+| 7:23 (~443s) | **HGN test (eye-tracking with pen) — the FIRST field sobriety test.** "Look at my pen right here... follow them." | Tiger is seated; officer is standing in front holding a small pen. The visual scene is dominated by Tiger's torso (blue golf shirt) — same composition as the preceding minute of interview about his medical history. **Small foreground objects (pens) don't move the embedding much; large-area body+vehicle dominates the embedding.** The two field tests we DID catch (one-leg-stand at 11:27, finger-pat at 12:44) involved more body motion. |
+
+**`test_assault_theft.mp4` — missed moments**
+
+| Time | What's actually happening | Why the algorithm missed it |
+|---|---|---|
+| 0:00–0:10 | **Initial dispatch + victim report.** "SFPD, we got a call about an assault... when you turn the corner he went that way, he took my bag." | The video opens MID-scene with the officer already moving. The 90-second rolling MAD window doesn't have enough preceding baseline to make this an outlier — the window's earliest samples ARE the dispatch moment. **Window initialization swallows opening events.** |
+| 0:11–1:09 | **The FOOT CHASE.** Repeated "SFPD stop!" calls at 11s, 12s, 25s, 27s, 34s, 57s, 67s — officer pursuing the suspect across an urban→park environment for nearly a full minute. | The chase is one long visual motion with continuously shifting urban backdrop. CLIP embeddings during running have moderate frame-to-frame deltas (background shifts), but the ROLLING MAD WINDOW (90 s = 180 samples) adapts — sustained motion becomes the local baseline, normalizing the chase signal toward zero. **Sustained scene transitions get normalized away by the very mechanism designed to surface anomalies.** |
+| 0:50 | **Suspect on the ground (post-takedown).** Visual analysis confirms: green grass + dark suspect on ground = a clear scene composition change from chase frames. | This DID likely produce a high local delta, but it gets swept up in the budget enforcement: with only 6.3s of budget on a 188s video, only 1 clip survives, and the higher-MAD pat-down moment (~87s) wins. **Budget enforcement is severity-greedy; co-occurring high-MAD moments cannibalize each other.** Confirmed: at the 60s budget, this region IS captured in the final reel. |
+| 2:30–2:34 | **"Unknown narcotics. Still got one in custody. We're going to need medical."** | After the pat-down/ID peaks at 87 and 112s, the rolling MAD window's local baseline is elevated by those high-action moments. The narcotics-discovery moment can't outrank them within the same window. **Sequential high-action events have diminishing salience.** |
+
+**`test_missing_person.mp4` — missed moments**
+
+| Time | What's actually happening | Why the algorithm missed it |
+|---|---|---|
+| 1:32 (~92s) | **THE SUSPECT IS NAMED:** "Barry Gonzalez was the second rule. He seems a little bit totally unstable. Yeah she reported it to HR." This is THE central piece of investigative information in the entire encounter. | Sean (the witness) is standing in the same position with the same composition for nearly the entire 2:54 video. Naming a suspect doesn't change the visual scene. **The algorithm cannot encode information that has no visual referent.** Pure dialogue value is invisible to CLIP. |
+| 2:23–2:51 | **Action plan + case wrap-up.** "I've got a report number for you 953292... I'll go down to Google. I'll talk to them. This is my card." Officer hands business card to Sean — a meaningful close-of-encounter moment. | Visually similar to the earlier ID transfer (peak 50.0s). The two card/photo handovers happen with very similar foreground hand gestures, so the local MAD window treats the second one as no longer anomalous — the FIRST one already pegged the score. **Repeated visual motifs lose salience after first occurrence.** |
+
+### Failure-mode taxonomy
+
+The 12 missed moments above cluster into 5 distinct failure modes:
+
+1. **Audio-only events** — the moment's significance is entirely in dialogue (JT's protest, "Why are you arresting me?", Barry Gonzalez reveal). The visual frame doesn't change. **CLIP cannot help here, ever** — this is the fundamental limit of visual-only selection.
+
+2. **Local baseline elevation in long stable scenes** — once a scene composition has been stable for a few minutes, the rolling MAD window adapts to it and suppresses peaks within. The arrest moment in JT (~1094s) was visually noteworthy (flashing patrol-car lights, subject silhouette) but came after 13 minutes of similar composition.
+
+3. **Sustained motion normalized as baseline** — the foot chase in `test_assault_theft` is the canonical example. Dramatic content (officer running, yelling) but the visual delta is moderate and sustained, so MAD treats it as the new normal.
+
+4. **Severity-greedy budget cannibalization** — when a video has multiple high-MAD events close together, only the highest-scoring few survive budget enforcement. The narcotics moment in `test_assault_theft` gets edged out by the earlier pat-down peak.
+
+5. **Repeated visual motifs lose salience** — the second card handover in `test_missing_person` looks visually identical to the first; rolling MAD treats the second as routine. Human attention would weight both equally, but the algorithm sees one as a "new event" and one as a "repeat".
+
+The first failure mode (audio-only events) is the **insurmountable** limit of the visual-only approach. The other four (baseline elevation, sustained motion, budget cannibalization, repeated motifs) are tunable in principle:
+- Larger MAD window → less local-baseline adaptation → catches longer-scale events
+- Per-event score boost for first-occurrence visual motifs → mitigates motif-repetition blindness
+- Budget enforcement that imposes minimum temporal coverage (e.g., must include first 10% of video) → fixes window-initialization swallowing
+- Diversity-aware selection (penalize semantically-similar clips) → mitigates cannibalization
+
+None of these are in v1 — they're all v2 ideas worth flagging for the next iteration. **For an "honest analysis" framing per spec §11, the headline finding is: the algorithm catches most procedural pivots but is blind to dialogue-only inflection points and adapts away from sustained drama. The reels are useful starting points for review, not exhaustive summaries.**
+
 ### Spec §11 limitations the design inherits
 
 - **Visually distinct ≠ important** — the algorithm picks moments where the visual scene changes most, not necessarily moments of greatest investigative value. The transcript cross-check above suggests these correlate well in practice (procedural pivots tend to coincide with visual transitions: officer turning to face suspect, witness arriving, items being shown to camera) but the correlation is not guaranteed.
