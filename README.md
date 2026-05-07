@@ -16,25 +16,118 @@ A Python pipeline that ingests a body cam video and emits a condensed highlight 
 
 ## Quickstart
 
+### One-time setup
+
 ```bash
-# Setup
+# 1. Python 3.11+ venv + pinned deps
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
-ffmpeg -version  # required at OS level
 
-# Single video (canonical entry, spec §9)
-.venv/bin/python3 pipeline.py videos/justin_timberlake.mp4
+# 2. System ffmpeg + ffprobe (required, NOT in requirements.txt)
+ffmpeg -version    # macOS: brew install ffmpeg
+ffprobe -version   # bundled with ffmpeg
 
-# Batch run (all 4 in-scope videos, frozen parameters)
-./run_all.sh
-
-# Outputs land in:
-#   output/reels/{video}_highlight.mp4              ← spec §6 default budget (1 min per 30 min of video)
-#   output/timestamps/{video}.json                  ← spec §8 schema
-#   output/clips/{video}/{NNN}.mp4                  ← intermediate clip files
-#   output/reels_60s/{video}_highlight_60s.mp4      ← supplemental fixed-60s reels (test videos benefit from this)
-#   output/timestamps_60s/{video}.json              ← matching JSON
+# 3. Drop your videos in
+mkdir -p videos
+cp /path/to/your/bodycam.mp4 videos/
+# Filenames can include spaces but lowercase + underscores is recommended
+# (the dev tools `tools/pipeline_from_cache.py` use the basename stem to find
+# matching cached embeddings under output/cache/)
 ```
+
+### Run the canonical pipeline (spec §9)
+
+```bash
+# Process one video — full pipeline (frame sample → CLIP → signal → clip → export → JSON)
+.venv/bin/python3 pipeline.py videos/yourvideo.mp4
+
+# All four CLI flags (spec §9 surface — no others are accepted):
+.venv/bin/python3 pipeline.py videos/yourvideo.mp4 \
+    --pelt                    # opt-in supplementary signal (default OFF) — see "On --pelt" below
+    --height 1.5              # MAD threshold for find_peaks (default 1.5; lower = more peaks)
+    --min-gap-sec 15.0        # min seconds between selected peaks (default 15)
+    --merge-gap-sec 3.0       # merge clips within this gap (default 3)
+```
+
+**Heads-up on the canonical entry:** `pipeline.py` re-extracts CLIP embeddings every run. On a system with ample MPS/CUDA memory this is fine (~10–22 min wall-clock per video depending on length). On Apple Silicon with constrained unified memory, MPS may deadlock on videos >~3,000 frames (see "Known Limitations: MPS deadlock" below). The cache-bypass workaround (`tools/pipeline_from_cache.py`) lets you separate the CLIP step from the rest of the pipeline.
+
+### Cache-bypass workflow (recommended on Apple Silicon)
+
+```bash
+# Step 1: pre-extract embeddings via the standalone harness in extract.py
+#         (smaller per-process MPS load — succeeds where pipeline.py hangs)
+.venv/bin/python3 extract.py videos/yourvideo.mp4
+# Produces: output/cache/yourvideo_embeddings.npy + _timestamps.npy
+
+# Step 2: run the rest of the pipeline against the cached embeddings (instant — pure numpy/scipy + ffmpeg)
+.venv/bin/python3 tools/pipeline_from_cache.py videos/yourvideo.mp4
+# Same CLI flags as pipeline.py: --pelt --height --min-gap-sec --merge-gap-sec
+```
+
+The cache-bypass is byte-equivalent to running pipeline.py end-to-end (same JSON output for the same embeddings) — it's just decoupled.
+
+### Supplemental: fixed-budget reels
+
+Spec §6 derives reel budget from source duration (1 min reel per 30 min video). For short videos (~3 min sources → 6s reels), this is too compressed to be useful for review. The `tools/pipeline_fixed_budget.py` tool overrides the budget calculation:
+
+```bash
+# 60-second reel regardless of source duration
+.venv/bin/python3 tools/pipeline_fixed_budget.py videos/yourvideo.mp4
+
+# Or any other budget
+.venv/bin/python3 tools/pipeline_fixed_budget.py videos/yourvideo.mp4 --target-budget-sec 90
+```
+
+Outputs to a separate folder so it doesn't conflict with the spec-compliant default-budget reels:
+```
+output/reels_60s/{video}_highlight_60s.mp4
+output/timestamps_60s/{video}.json
+output/clips_60s/{video}/{NNN}.mp4
+```
+
+This tool also requires the cached embeddings (run `extract.py` first).
+
+### Batch processing
+
+`run_all.sh` is the in-this-repo example for running all 4 in-scope videos with frozen parameters via the cache-bypass tool. Adapt it for your own video set:
+
+```bash
+# Edit run_all.sh's VIDEOS=( ... ) array, then:
+./run_all.sh
+```
+
+Or roll your own loop:
+```bash
+for video in videos/*.mp4; do
+    .venv/bin/python3 tools/pipeline_from_cache.py "$video"
+done
+```
+
+### Output paths
+
+```
+output/reels/{video}_highlight.mp4              ← spec §6 default-budget reel
+output/timestamps/{video}.json                  ← spec §8 manifest
+output/clips/{video}/{NNN}.mp4                  ← intermediate per-clip files
+output/clips/{video}/concat_manifest.txt        ← ffmpeg concat manifest
+output/cache/{video}_embeddings.npy             ← cached CLIP embeddings (~7 MB per ~2k frames)
+output/cache/{video}_timestamps.npy             ← cached frame timestamps
+output/reels_60s/{video}_highlight_60s.mp4      ← supplemental fixed-budget reel
+output/timestamps_60s/{video}.json              ← supplemental manifest
+```
+
+The `output/` directory is gitignored.
+
+### On `--pelt` (opt-in supplementary signal)
+
+`--pelt` enables PELT changepoint detection as a cross-check on MAD-based peaks. When passed:
+- `signal_processing.detect_changepoints` lazy-imports `ruptures` (never loaded otherwise)
+- MAD peaks within ±5 samples of a PELT changepoint receive a 1.2× score boost before budget enforcement
+- The JSON's `coincides_with_pelt_changepoint` field flips from `null` → `true`/`false` per clip (strict three-state — never omitted)
+
+**Whether `--pelt` actually changes selection depends on the signal characteristics.** In our tuning A/B on tiger_woods (spec-default budget), `--pelt` did NOT alter the final clip selection — all three top peaks already pegged the MAD ceiling (score=10.0), so the 1.2× boost couldn't reorder them. The PELT field DID flip to `true` for all three selected peaks, confirming they coincide with structural changepoints (informational metadata only). On signals with more variance in the top-peaks, `--pelt` may reorder selection.
+
+**The reels included in this repo were produced WITHOUT `--pelt`** — the `coincides_with_pelt_changepoint` field is `null` in every JSON. Re-running with `--pelt` enabled is a one-line change. Both are valid per spec §5 (PELT is opt-in supplementary).
 
 ## Frozen Tuning Parameters
 
