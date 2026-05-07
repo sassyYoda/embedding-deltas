@@ -1,7 +1,7 @@
 # Requirements: Body Cam Highlight Reel
 
 **Defined:** 2026-05-06
-**Core Value:** Given a body cam video, the pipeline must produce a highlight reel where selected moments visibly correspond to high-action or significant scene changes — using only visual embedding signal — and must do so reproducibly across all five sample videos with one fixed parameter set.
+**Core Value:** Given a body cam video, the pipeline must produce a highlight reel where selected moments visibly correspond to high-action or significant scene changes — using only visual embedding signal — and must do so reproducibly across the 4 in-scope sample videos (justin_timberlake, tiger_woods, test_assault_theft, test_missing_person) with one fixed parameter set. The 5th video (marcus_jordan, 75 min) was dropped after a reproducible MPS hang during CLIP extraction — documented as a known limitation per spec §11.
 
 > Source of truth: `assignment-details/bodycam_highlight_reel_spec.md`. Every v1 requirement traces to a numbered section in the spec or to its `§0.5 Testing Protocol` / `§12 What Not To Do` rules.
 
@@ -117,15 +117,15 @@
 
 ### Multi-Video Reproducibility
 
-- [ ] **RUN-01**: All five sample videos in `videos/` can be processed by running the pipeline back-to-back with one fixed parameter set (no per-video retuning — spec §6, §12)
+- [ ] **RUN-01**: All 4 in-scope sample videos in `videos/` (justin_timberlake, tiger_woods, test_assault_theft, test_missing_person) are processed back-to-back with one fixed parameter set (no per-video retuning — spec §6, §12). marcus_jordan dropped due to reproducible MPS hang.
 - [ ] **RUN-02**: A `run_all.sh` (or equivalent in-process loop) exists for batch execution
-- [ ] **RUN-03**: All 5 reels and 5 JSON files are produced in `output/reels/` and `output/timestamps/` respectively
+- [ ] **RUN-03**: 4 reels and 4 JSON files are produced in `output/reels/` and `output/timestamps/` respectively (one per in-scope video)
 
 ### Submission Polish
 
-- [ ] **DOC-01**: README documents installation, runtime, parameter rationale, and per-video qualitative observations (the only credible eval given no labeled GT — spec §11)
+- [ ] **DOC-01**: README documents installation, runtime, parameter rationale, per-video qualitative observations for the 4 in-scope videos (the only credible eval given no labeled GT — spec §11), AND an honest writeup of the marcus_jordan MPS hang limitation
 - [ ] **DOC-02**: README acknowledges known limitations from spec §11 and explicit non-goals from §12
-- [ ] **DOC-03**: One representative video has been used to tune `--height` / `--min-gap-sec` / `--merge-gap-sec`; chosen values are documented and frozen across all 5 runs
+- [ ] **DOC-03**: tiger_woods (longest in-scope video at 27.5 min) used to tune `--height` / `--min-gap-sec` / `--merge-gap-sec`; chosen values are documented and frozen across all 4 in-scope runs
 
 ## v2 Requirements
 

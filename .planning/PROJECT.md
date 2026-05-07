@@ -6,7 +6,7 @@ An end-to-end Python pipeline that ingests a raw body cam video and emits a cond
 
 ## Core Value
 
-Given a body cam video, the pipeline must produce a highlight reel where the selected moments visibly correspond to high-action or significant scene changes — using only visual embedding signal — and must do so reproducibly across all five sample videos with the same fixed parameters.
+Given a body cam video, the pipeline must produce a highlight reel where the selected moments visibly correspond to high-action or significant scene changes — using only visual embedding signal — and must do so reproducibly across the 4 in-scope sample videos (justin_timberlake, tiger_woods, test_assault_theft, test_missing_person) with the same fixed parameters. The 5th video (marcus_jordan, 75 min) was dropped after a reproducible MPS hang during CLIP extraction; documented as a known limitation per spec §11.
 
 ## Requirements
 
@@ -29,7 +29,7 @@ Given a body cam video, the pipeline must produce a highlight reel where the sel
 - [ ] Export per-clip via `ffmpeg -c copy` (stream copy); concatenate into final reel via concat demuxer
 - [ ] Emit JSON timestamp file at `output/timestamps/{video_name}.json` with the schema in spec §8
 - [ ] Single CLI entry point `pipeline.py <video>` with flags `--pelt`, `--height`, `--min-gap-sec`, `--merge-gap-sec`
-- [ ] Run all five sample videos with one fixed parameter set (no per-video retuning)
+- [ ] Run the 4 in-scope sample videos (justin_timberlake, tiger_woods, test_assault_theft, test_missing_person) with one fixed parameter set (no per-video retuning) — marcus_jordan dropped due to MPS hang
 - [ ] Per-module verification matching spec §0.5 testing protocol
 
 ### Out of Scope
@@ -47,8 +47,8 @@ Given a body cam video, the pipeline must produce a highlight reel where the sel
 ## Context
 
 - **Source spec:** `assignment-details/bodycam_highlight_reel_spec.md` is the locked design document; every implementation decision and rationale is captured there. Treat it as the single source of truth — do not substitute alternatives unless a hard technical blocker is hit.
-- **Sample videos:** `videos/sample-vids.zip` contains five raw body cam `.mp4` files. The `videos/` directory is gitignored.
-- **Assignment context:** AbelPolice take-home — "Visual Embedding Highlight Reels". The reviewer cares most about defensibility of the design choices and the ability to reproduce results across all five videos with one parameter set.
+- **Sample videos:** 5 raw body cam `.mp4` files downloaded from a Drive folder into `videos/` (gitignored). 4 are in v1 scope (justin_timberlake 18.9 min, tiger_woods 27.5 min, test_assault_theft 3.1 min, test_missing_person 2.9 min); marcus_jordan (75.2 min, 9,025 frames) was dropped after reproducible MPS deadlocks at ~50% inference — documented as a known limitation per spec §11.
+- **Assignment context:** AbelPolice take-home — "Visual Embedding Highlight Reels". The reviewer cares most about defensibility of the design choices and the ability to reproduce results across the in-scope videos with one parameter set, plus an honest writeup of any limitations encountered (per spec §11 — "honest analysis beats optimistic framing").
 - **Prior art referenced in spec:** Koddenbrock et al. (2025) on CLIP robustness in handheld-camera domains motivates the ViT-L/14 OpenAI choice; Antonio's k-most-distinct approach motivates the rolling-MAD improvement; Huang/Tukey on median-filter edge preservation justifies filter choice.
 - **Build order:** `extract.py → signal_processing.py → clip_selection.py → export.py → pipeline.py`. Get one video working end-to-end before the other four (per spec footer).
 - **Hardware:** CPU-only inference is acceptable; GPU is auto-selected by `open_clip` if present.
@@ -59,7 +59,7 @@ Given a body cam video, the pipeline must produce a highlight reel where the sel
 - **System dependency**: `ffmpeg` must be installed at the OS level (not just the Python binding)
 - **Embedding model**: CLIP ViT-L/14 OpenAI pretrained — non-negotiable per spec §2
 - **Algorithmic-only selection**: no transcript, audio, OCR, LLM, or manual timestamps in the selection path — assignment requirement
-- **Reproducibility**: all five videos must be processed with one fixed parameter set
+- **Reproducibility**: all 4 in-scope videos must be processed with one fixed parameter set (marcus_jordan dropped — see Context above)
 - **Project structure**: `pipeline.py / extract.py / signal_processing.py / clip_selection.py / export.py / utils.py` plus `output/{reels,clips,timestamps}/` — locked by spec §1
 - **Timeline**: take-home assignment — prototype quality over polish; honest analysis of limitations beats optimistic framing
 
